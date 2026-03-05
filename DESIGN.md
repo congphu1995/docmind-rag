@@ -411,8 +411,8 @@ class BaseLLMClient(ABC):
 
 | Provider | Model | Role |
 |---|---|---|
-| **Claude** (primary) | claude-opus-4-20250514 | Main generation |
-| **GPT-4o** (secondary) | gpt-4o | Alternative — user toggles in UI |
+| **GPT-4o** (primary) | gpt-4o | Main generation |
+| **Claude** (secondary) | claude-sonnet-4-20250514 | Alternative — user toggles in UI |
 | **GPT-4o-mini** | gpt-4o-mini | HyDE generation, metadata extraction, doc summary |
 | **GPT-4o Vision** | gpt-4o | Figure description, scanned page OCR fallback |
 

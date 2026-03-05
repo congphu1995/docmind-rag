@@ -187,7 +187,7 @@ class Settings(BaseSettings):
     # LLM
     openai_api_key: str
     anthropic_api_key: str = ""
-    default_llm: Literal["claude", "openai"] = "claude"
+    default_llm: Literal["claude", "openai"] = "openai"
 
     # Embedding
     embedding_model: str = "text-embedding-3-small"
