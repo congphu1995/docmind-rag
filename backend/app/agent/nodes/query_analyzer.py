@@ -38,7 +38,7 @@ async def query_analyzer(state: RAGAgentState) -> dict:
             "query_type": analysis.query_type,
             "detected_language": analysis.language,
             "sub_questions": analysis.sub_questions,
-            "extracted_filters": analysis.filters,
+            "extracted_filters": analysis.filters.model_dump(exclude_defaults=True),
             "agent_trace": [
                 f"Query classified as: {analysis.query_type} "
                 f"(lang={analysis.language})"

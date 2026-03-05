@@ -27,6 +27,15 @@ class ChatResponse(BaseModel):
     agent_trace: list[str]
 
 
+class QueryFilters(BaseModel):
+    """Extracted metadata filters from query."""
+    model_config = {"extra": "forbid"}
+
+    doc_type: str = Field(default="", description="Document type filter if mentioned")
+    date_range: str = Field(default="", description="Date range if mentioned")
+    organization: str = Field(default="", description="Organization filter if mentioned")
+
+
 class QueryAnalysis(BaseModel):
     """Structured output for query classification."""
     query_type: str = Field(
@@ -37,7 +46,7 @@ class QueryAnalysis(BaseModel):
         default_factory=list,
         description="Sub-questions for multi_hop queries, empty otherwise",
     )
-    filters: dict = Field(
-        default_factory=dict,
-        description="Extracted metadata filters: doc_type, date_range, etc.",
+    filters: QueryFilters = Field(
+        default_factory=QueryFilters,
+        description="Extracted metadata filters from the query",
     )

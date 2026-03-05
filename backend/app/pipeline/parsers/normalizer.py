@@ -15,10 +15,11 @@ class ElementNormalizer:
         """Convert Docling Document object → List[ParsedElement]."""
         elements = []
         current_section = ""
+        doc = docling_result.document
 
-        for item in docling_result.document.body.children:
+        for item, _level in doc.iterate_items():
             el_type = self._map_docling_type(item)
-            content = self._extract_docling_content(item)
+            content = self._extract_docling_content(item, doc)
 
             if not content or not content.strip():
                 continue
@@ -37,7 +38,7 @@ class ElementNormalizer:
                         current_section if el_type != ElementType.TITLE else None
                     ),
                     table_html=(
-                        self._get_table_html(item)
+                        self._get_table_html(item, doc)
                         if el_type == ElementType.TABLE
                         else None
                     ),
@@ -85,11 +86,16 @@ class ElementNormalizer:
     def _map_docling_type(self, item) -> ElementType:
         type_map = {
             "section_header": ElementType.TITLE,
+            "title": ElementType.TITLE,
             "text": ElementType.TEXT,
             "table": ElementType.TABLE,
+            "picture": ElementType.FIGURE,
             "figure": ElementType.FIGURE,
             "list_item": ElementType.LIST_ITEM,
             "code": ElementType.CODE,
+            "caption": ElementType.TEXT,
+            "footnote": ElementType.TEXT,
+            "formula": ElementType.TEXT,
         }
         item_type = getattr(item, "label", "text")
         return type_map.get(str(item_type).lower(), ElementType.TEXT)
@@ -137,17 +143,21 @@ class ElementNormalizer:
         except (AttributeError, IndexError):
             return 0
 
-    def _get_table_html(self, item) -> Optional[str]:
+    def _get_table_html(self, item, doc=None) -> Optional[str]:
         try:
-            return item.export_to_html()
+            return item.export_to_html(doc=doc) if doc else item.export_to_html()
         except Exception:
             return None
 
-    def _extract_docling_content(self, item) -> str:
-        try:
-            return item.export_to_markdown()
-        except Exception:
-            return str(getattr(item, "text", ""))
+    def _extract_docling_content(self, item, doc=None) -> str:
+        # Tables and pictures have export_to_markdown; text items use .text
+        label = str(getattr(item, "label", ""))
+        if label in ("table", "picture"):
+            try:
+                return item.export_to_markdown(doc=doc) if doc else item.export_to_markdown()
+            except Exception:
+                pass
+        return str(getattr(item, "text", ""))
 
     def _assign_reading_order(
         self, elements: list[ParsedElement]

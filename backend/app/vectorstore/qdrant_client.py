@@ -71,9 +71,9 @@ class QdrantWrapper:
         qdrant_filter = self._build_filter(filters) if filters else None
 
         try:
-            results = self._client.search(
+            response = self._client.query_points(
                 collection_name=self._collection,
-                query_vector=vector,
+                query=vector,
                 limit=top_k,
                 score_threshold=score_threshold or settings.retrieval_score_threshold,
                 query_filter=qdrant_filter,
@@ -82,7 +82,7 @@ class QdrantWrapper:
         except Exception as e:
             raise VectorStoreError(f"Qdrant search failed: {e}") from e
 
-        return results
+        return response.points
 
     async def delete_by_doc_id(self, doc_id: str):
         self._client.delete(
