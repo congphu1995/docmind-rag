@@ -16,6 +16,8 @@ from backend.app.pipeline.embedders.openai_embedder import OpenAIEmbedder
 from backend.app.pipeline.llm.factory import LLMFactory
 from backend.app.pipeline.parsers.factory import ParserFactory
 from backend.app.pipeline.parsers.metadata_extractor import MetadataExtractor
+from backend.app.pipeline.multimodal.figure_describer import FigureDescriber
+from backend.app.pipeline.multimodal.table_representer import TableRepresenter
 from backend.app.pipeline.parsers.preprocessor import PDFPreprocessor
 from backend.app.vectorstore.qdrant_client import QdrantWrapper
 
@@ -24,9 +26,15 @@ class IngestionService:
 
     def __init__(self):
         mini_llm = LLMFactory.create_mini()
+        vision_llm = LLMFactory.create("openai", model="gpt-4o")
         self._preprocessor = PDFPreprocessor()
         self._metadata_extractor = MetadataExtractor(llm=mini_llm)
-        self._router = SmartRouter()
+        self._figure_describer = FigureDescriber(llm=vision_llm)
+        self._table_representer = TableRepresenter(llm=mini_llm)
+        self._router = SmartRouter(
+            figure_describer=self._figure_describer,
+            table_representer=self._table_representer,
+        )
         self._enricher = ContextEnricher(llm=mini_llm)
         self._quality_filter = QualityFilter()
         self._embedder = OpenAIEmbedder()
@@ -85,7 +93,7 @@ class IngestionService:
 
             # 4. Chunk
             log.info("stage_chunk")
-            parent_chunks, child_chunks = self._router.route(
+            parent_chunks, child_chunks = await self._router.route(
                 elements, doc_metadata
             )
             log.info(
