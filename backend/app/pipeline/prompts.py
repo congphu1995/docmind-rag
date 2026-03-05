@@ -28,3 +28,13 @@ Be specific with numbers when visible.
 Output a paragraph suitable for document search — someone searching for this information should find it.
 
 Document context: {doc_context}"""
+
+TABLE_NL_PROMPT = """\
+Convert this table into natural language sentences.
+Describe every row with its key values. Be specific with all numbers.
+Output plain text — no markdown, no bullet points.
+
+Section context: {section_context}
+
+Table:
+{table}"""
