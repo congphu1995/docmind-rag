@@ -29,6 +29,48 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - QDRANT_HOST=qdrant
+      - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
+      - REDIS_URL=redis://redis:6379/0
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      - qdrant
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uv run celery -A backend.app.workers.celery_app worker --loglevel=info
+    env_file: .env
+    environment:
+      - QDRANT_HOST=qdrant
+      - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
+      - REDIS_URL=redis://redis:6379/0
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      - qdrant
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
 volumes:
   qdrant_data:
   postgres_data:
