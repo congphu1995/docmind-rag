@@ -62,7 +62,8 @@ export function streamChat(
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
-        for (const line of lines) {
+        for (const rawLine of lines) {
+          const line = rawLine.replace(/\r$/, "");
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6);
 
