@@ -174,13 +174,17 @@ class ParentChildChunker(BaseChunker):
         if len(words) <= self.child_size:
             return [text]
 
+        step = self.child_size - self.overlap
+        if step <= 0:
+            step = self.child_size
+
         children = []
         start = 0
         while start < len(words):
             end = min(start + self.child_size, len(words))
             child_text = " ".join(words[start:end])
             children.append(child_text)
-            start += self.child_size - self.overlap
+            start += step
 
         return children
 
