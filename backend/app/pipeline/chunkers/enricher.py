@@ -4,20 +4,16 @@ Anthropic technique — +15-20% retrieval precision at one-time index cost.
 """
 import asyncio
 
-from openai import AsyncOpenAI
-
-from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.pipeline.base.chunker import Chunk
+from backend.app.pipeline.base.llm_client import BaseLLMClient
 from backend.app.pipeline.prompts import ENRICHMENT_PROMPT
 
 
 class ContextEnricher:
-    # TODO(week2): Replace direct AsyncOpenAI with BaseLLMClient injection
 
-    def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
-        self._model = "gpt-4o-mini"
+    def __init__(self, llm: BaseLLMClient):
+        self._llm = llm
 
     async def enrich_batch(
         self,
@@ -74,15 +70,13 @@ class ContextEnricher:
                 chunk_text=chunk.content_raw[:500],
             )
 
-            response = await self._client.chat.completions.create(
-                model=self._model,
+            context_sentence = await self._llm.complete(
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=80,
                 temperature=0,
-                messages=[{"role": "user", "content": prompt}],
             )
 
-            context_sentence = response.choices[0].message.content.strip()
-            enriched_content = f"{context_sentence}\n\n{chunk.content_raw}"
+            enriched_content = f"{context_sentence.strip()}\n\n{chunk.content_raw}"
 
             return Chunk(
                 **{k: v for k, v in chunk.__dict__.items() if k != "content"},

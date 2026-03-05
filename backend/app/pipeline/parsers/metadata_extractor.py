@@ -1,21 +1,18 @@
 """
 Extract document-level metadata with one LLM call.
 Result stored with every chunk in Qdrant payload.
-Uses OpenAI structured output — returns a validated Pydantic model, no manual JSON parsing.
+Uses structured output — returns a validated Pydantic model.
 """
-from openai import AsyncOpenAI
-
-from backend.app.core.config import settings
+from backend.app.pipeline.base.llm_client import BaseLLMClient
 from backend.app.pipeline.base.parser import ElementType, ParsedElement
 from backend.app.pipeline.prompts import METADATA_EXTRACTION_PROMPT
 from backend.app.schemas.pipeline import DocumentMetadata
 
 
 class MetadataExtractor:
-    # TODO(week2): Replace direct AsyncOpenAI with BaseLLMClient injection
 
-    def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+    def __init__(self, llm: BaseLLMClient):
+        self._llm = llm
 
     async def extract(self, elements: list[ParsedElement]) -> dict:
         """Extract doc-level metadata from first ~2000 chars of document."""
@@ -34,10 +31,7 @@ class MetadataExtractor:
             ).model_dump()
 
         try:
-            response = await self._client.beta.chat.completions.parse(
-                model="gpt-4o-mini",
-                max_tokens=200,
-                temperature=0,
+            result = await self._llm.complete_structured(
                 messages=[
                     {
                         "role": "user",
@@ -46,9 +40,11 @@ class MetadataExtractor:
                         ),
                     }
                 ],
-                response_format=DocumentMetadata,
+                response_model=DocumentMetadata,
+                max_tokens=200,
+                temperature=0,
             )
-            return response.choices[0].message.parsed.model_dump()
+            return result.model_dump()
         except Exception:
             return DocumentMetadata(
                 title="Unknown",

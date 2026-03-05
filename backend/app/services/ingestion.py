@@ -13,6 +13,7 @@ from backend.app.pipeline.chunkers.enricher import ContextEnricher
 from backend.app.pipeline.chunkers.quality_filter import QualityFilter
 from backend.app.pipeline.chunkers.smart_router import SmartRouter
 from backend.app.pipeline.embedders.openai_embedder import OpenAIEmbedder
+from backend.app.pipeline.llm.factory import LLMFactory
 from backend.app.pipeline.parsers.factory import ParserFactory
 from backend.app.pipeline.parsers.metadata_extractor import MetadataExtractor
 from backend.app.pipeline.parsers.preprocessor import PDFPreprocessor
@@ -22,10 +23,11 @@ from backend.app.vectorstore.qdrant_client import QdrantWrapper
 class IngestionService:
 
     def __init__(self):
+        mini_llm = LLMFactory.create_mini()
         self._preprocessor = PDFPreprocessor()
-        self._metadata_extractor = MetadataExtractor()
+        self._metadata_extractor = MetadataExtractor(llm=mini_llm)
         self._router = SmartRouter()
-        self._enricher = ContextEnricher()
+        self._enricher = ContextEnricher(llm=mini_llm)
         self._quality_filter = QualityFilter()
         self._embedder = OpenAIEmbedder()
         self._qdrant = QdrantWrapper()
