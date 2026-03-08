@@ -18,19 +18,15 @@ class ParentChildChunker(BaseChunker):
 
     def __init__(
         self,
-        parent_target: int | None = None,
         parent_min_words: int | None = None,
         parent_max_words: int | None = None,
-        child_target: int | None = None,
         child_min_words: int | None = None,
         child_max_words: int | None = None,
     ):
-        self.parent_target = parent_target or settings.parent_chunk_size
-        self.parent_min_words = parent_min_words or settings.parent_min_words
-        self.parent_max_words = parent_max_words or settings.parent_max_words
-        self.child_target = child_target or settings.child_chunk_size
-        self.child_min_words = child_min_words or settings.child_min_words
-        self.child_max_words = child_max_words or settings.child_max_words
+        self.parent_min_words = parent_min_words if parent_min_words is not None else settings.parent_min_words
+        self.parent_max_words = parent_max_words if parent_max_words is not None else settings.parent_max_words
+        self.child_min_words = child_min_words if child_min_words is not None else settings.child_min_words
+        self.child_max_words = child_max_words if child_max_words is not None else settings.child_max_words
 
     # ── public API ──────────────────────────────────────────────
 

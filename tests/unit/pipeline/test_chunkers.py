@@ -1,5 +1,3 @@
-import pytest
-
 from backend.app.pipeline.base.chunker import Chunk
 from backend.app.pipeline.base.parser import ElementType, ParsedElement
 from backend.app.pipeline.chunkers.parent_child_chunker import ParentChildChunker
