@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app.core.config import settings
 from backend.app.models.document import Base
+import backend.app.models.user  # noqa: F401 — register User table
 
 engine = create_async_engine(
     settings.postgres_url,
