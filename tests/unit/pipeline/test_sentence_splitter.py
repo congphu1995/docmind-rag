@@ -43,3 +43,15 @@ def test_multi_line_paragraph():
     text = "This is line one. This is line two.\n\nThis is a new paragraph. With two sentences."
     result = split_sentences(text)
     assert len(result) == 4
+
+
+def test_eg_ie_not_split():
+    text = "Use e.g. Python or i.e. JavaScript for this."
+    result = split_sentences(text)
+    assert len(result) == 1
+
+
+def test_tab_whitespace_splits():
+    text = "End of sentence.\tStart of next."
+    result = split_sentences(text)
+    assert len(result) == 2

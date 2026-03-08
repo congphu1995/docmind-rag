@@ -41,6 +41,9 @@ _ABBREVIATIONS = frozenset(
 # Matches single uppercase letter followed by a period (e.g. the letters in D.C.)
 _INITIAL_RE = re.compile(r"^[A-Z]$")
 
+# Matches multi-part abbreviations like "e.g", "i.e" (single letters separated by dots)
+_MULTI_PART_ABBREV_RE = re.compile(r"^[a-zA-Z](\.[a-zA-Z])+$")
+
 
 def split_sentences(text: str) -> list[str]:
     """Split *text* into sentences.
@@ -97,9 +100,9 @@ def _split_line(line: str) -> list[str]:
                 j += 1
 
             # Need at least one whitespace character after punctuation
-            if j < length and line[j] == " ":
+            if j < length and line[j] in " \t":
                 k = j
-                while k < length and line[k] == " ":
+                while k < length and line[k] in " \t":
                     k += 1
 
                 # Check what follows the whitespace
@@ -148,6 +151,11 @@ def _is_abbreviation(line: str, dot_pos: int, seg_start: int) -> bool:
 
     # Check against known abbreviation list
     if word.lower().rstrip(".") in _ABBREVIATIONS:
+        return True
+
+    # Detect multi-part abbreviations like e.g., i.e., etc.
+    # Pattern: sequences of single lowercase letters separated by periods (e.g. "e.g")
+    if _MULTI_PART_ABBREV_RE.match(word):
         return True
 
     return False
