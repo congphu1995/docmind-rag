@@ -1,6 +1,10 @@
+import React from "react";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/stores/chatStore";
-import SourceCard from "./SourceCard";
+import type { ChatMeta } from "@/api/chat";
+import ThinkingIndicator from "./ThinkingIndicator";
+import SourceFootnote from "./SourceFootnote";
+import SourceBar from "./SourceBar";
 import AgentTrace from "./AgentTrace";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,8 +14,61 @@ interface Props {
   index: number;
 }
 
+type Source = ChatMeta["sources"][number];
+
+/**
+ * Walk react-markdown children, find string segments containing [N],
+ * and replace them with SourceFootnote chips.
+ */
+function processFootnotes(
+  children: React.ReactNode,
+  sources: Source[]
+): React.ReactNode {
+  return React.Children.map(children, (child) => {
+    if (typeof child === "string") {
+      const parts = child.split(/\[(\d+)\]/g);
+      if (parts.length === 1) return child;
+      return parts.map((part, i) => {
+        if (i % 2 === 1) {
+          const num = parseInt(part, 10);
+          const source = sources.find((s) => s.source_num === num);
+          if (source) return <SourceFootnote key={`fn-${num}-${i}`} source={source} />;
+          return `[${part}]`;
+        }
+        return part || null;
+      });
+    }
+    if (React.isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
+      return React.cloneElement(child, {}, processFootnotes(child.props.children, sources));
+    }
+    return child;
+  });
+}
+
+/**
+ * Build react-markdown component overrides that inject footnote chips
+ * into rendered paragraph, list-item, and table-cell elements.
+ */
+function useFootnoteComponents(sources: Source[]) {
+  if (!sources.length) return {};
+  return {
+    p: ({ children, ...props }: React.ComponentProps<"p">) => (
+      <p {...props}>{processFootnotes(children, sources)}</p>
+    ),
+    li: ({ children, ...props }: React.ComponentProps<"li">) => (
+      <li {...props}>{processFootnotes(children, sources)}</li>
+    ),
+    td: ({ children, ...props }: React.ComponentProps<"td">) => (
+      <td {...props}>{processFootnotes(children, sources)}</td>
+    ),
+  };
+}
+
 export default function MessageBubble({ message, index }: Props) {
   const isUser = message.role === "user";
+  const sources = message.meta?.sources ?? [];
+  const footnoteComponents = useFootnoteComponents(sources);
+  const isThinking = message.isStreaming && message.content === "";
 
   return (
     <div
@@ -31,27 +88,25 @@ export default function MessageBubble({ message, index }: Props) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <div className="prose-chat text-sm leading-relaxed">
-              <Markdown remarkPlugins={[remarkGfm]}>
-                {message.content}
-              </Markdown>
-              {message.isStreaming && (
-                <span className="inline-block w-2 h-4 bg-primary/60 ml-0.5 animate-pulse rounded-sm" />
-              )}
-            </div>
-
-            {/* Sources */}
-            {message.meta?.sources && message.meta.sources.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Sources
-                </p>
-                <div className="grid gap-2">
-                  {message.meta.sources.map((source) => (
-                    <SourceCard key={source.source_num} source={source} />
-                  ))}
-                </div>
+            {isThinking ? (
+              <ThinkingIndicator />
+            ) : (
+              <div className="prose-chat text-sm leading-relaxed">
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  components={footnoteComponents}
+                >
+                  {message.content}
+                </Markdown>
+                {message.isStreaming && (
+                  <span className="inline-block w-0.5 h-4 bg-primary/70 ml-0.5 animate-blink rounded-full" />
+                )}
               </div>
+            )}
+
+            {/* Source bar */}
+            {!isThinking && sources.length > 0 && (
+              <SourceBar sources={sources} />
             )}
 
             {/* Agent trace */}
