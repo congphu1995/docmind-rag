@@ -1,57 +1,67 @@
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import type { Message } from "@/stores/chatStore";
 import SourceCard from "./SourceCard";
 import AgentTrace from "./AgentTrace";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Props {
   message: Message;
+  index: number;
 }
 
-export default function MessageBubble({ message }: Props) {
+export default function MessageBubble({ message, index }: Props) {
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex mb-4", isUser ? "justify-end" : "justify-start")}>
-      <Card
-        className={cn(
-          "max-w-[75%] px-4 py-3 shadow-sm",
-          isUser
-            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
-            : "bg-card rounded-2xl rounded-bl-sm"
-        )}
-      >
-        {/* Message content */}
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+    <div
+      className={cn("mb-6 animate-slide-up", isUser && "flex justify-end")}
+      style={{ animationDelay: `${Math.min(index * 50, 300)}ms` }}
+    >
+      {isUser ? (
+        <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-md bg-primary text-primary-foreground text-sm leading-relaxed">
           {message.content}
-          {message.isStreaming && (
-            <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 animate-pulse" />
-          )}
         </div>
+      ) : (
+        <div className="flex gap-3">
+          {/* Avatar */}
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-xs font-semibold text-primary">D</span>
+          </div>
 
-        {/* Sources */}
-        {!isUser && message.meta?.sources && message.meta.sources.length > 0 && (
-          <>
-            <Separator className="my-3" />
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Sources
-            </p>
-            <div className="space-y-1.5">
-              {message.meta.sources.map((source) => (
-                <SourceCard key={source.source_num} source={source} />
-              ))}
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="prose-chat text-sm leading-relaxed">
+              <Markdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </Markdown>
+              {message.isStreaming && (
+                <span className="inline-block w-2 h-4 bg-primary/60 ml-0.5 animate-pulse rounded-sm" />
+              )}
             </div>
-          </>
-        )}
 
-        {/* Agent trace */}
-        {!isUser &&
-          message.meta?.agent_trace &&
-          message.meta.agent_trace.length > 0 && (
-            <AgentTrace trace={message.meta.agent_trace} />
-          )}
-      </Card>
+            {/* Sources */}
+            {message.meta?.sources && message.meta.sources.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Sources
+                </p>
+                <div className="grid gap-2">
+                  {message.meta.sources.map((source) => (
+                    <SourceCard key={source.source_num} source={source} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Agent trace */}
+            {message.meta?.agent_trace &&
+              message.meta.agent_trace.length > 0 && (
+                <AgentTrace trace={message.meta.agent_trace} />
+              )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
