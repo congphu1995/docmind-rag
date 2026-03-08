@@ -5,12 +5,15 @@ Adaptive retriever with retry loop.
 3. Retry with expanded query if quality < threshold
 4. Fetch parent chunks from PostgreSQL for richer LLM context
 """
+import time
+
 from sqlalchemy import select
 
 from backend.app.agent.state import RAGAgentState
 from backend.app.core.config import settings
 from backend.app.core.database import AsyncSessionLocal
 from backend.app.core.logging import logger
+from backend.app.core.metrics import RETRIEVAL_DURATION
 from backend.app.models.document import ParentChunk
 from backend.app.pipeline.embedders.openai_embedder import OpenAIEmbedder
 from backend.app.pipeline.llm.factory import LLMFactory
@@ -106,6 +109,8 @@ async def retriever_node(state: RAGAgentState) -> dict:
     results = []
     attempt = 0
 
+    search_start = time.perf_counter()
+
     for attempt in range(MAX_ATTEMPTS):
         vector = await embedder.embed_single(query_text)
         results = await qdrant.search(
@@ -145,6 +150,8 @@ async def retriever_node(state: RAGAgentState) -> dict:
 
     # Fetch parent chunks from PostgreSQL
     chunks = await _fetch_parents(results)
+
+    RETRIEVAL_DURATION.observe(time.perf_counter() - search_start)
 
     log.info(
         "retrieval_done",
