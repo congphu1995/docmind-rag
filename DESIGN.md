@@ -56,21 +56,14 @@ Eval:      RAGAS, FinanceBench, committed results JSON
 Frontend:  Chat UI (streaming + citations + LLM toggle + agent trace), Upload zone
 ```
 
-#### Explicitly Skipped — Mention as Roadmap ⏭
+#### Roadmap ⏭
 
 ```
-SemanticChunker standalone    parent-child covers this use case
-UnstructuredParser            Docling handles enough formats for demo
 AzureDIParser                 roadmap — you have the Azure certs already
 BGE-M3 local embedder         roadmap — multilingual support
 CohereReranker                identity reranker now, Cohere later
 SelfCheckNode                 add after core pipeline is stable
-DocVQA eval                   FinanceBench alone is enough for README
-Prometheus + Grafana          Langfuse traces sufficient for demo
 Redis query cache             add after basic pipeline works
-JWT auth                      demo doesn't need it
-EvalDashboard frontend        metrics table in README is enough
-ChunkViewer frontend          nice to have, not critical
 ```
 
 ---
@@ -286,12 +279,18 @@ class PDFPreprocessor:
 
 ### 3.3 Chunker Layer
 
-**Single config used throughout the demo project:**
+**Semantic Parent-Child chunking — paragraph-aware, section-based:**
 
 ```
-Structural Parent-Child + Semantic children
-  Parent: 800 words   →  section boundary  →  PostgreSQL
-  Child:  150 words   →  semantic split    →  Qdrant (embedded)
+Parents: section-based (one heading = one parent)
+  Merge sections < 200 words. Split sections > 1200 words at paragraph boundaries.
+  Target ~800 words. Stored in PostgreSQL.
+
+Children: paragraph-based within each parent
+  Merge paragraphs < 50 words. Split paragraphs > 250 words at sentence boundaries.
+  Target ~150 words. Embedded and stored in Qdrant.
+
+Sentence-based overlap between parent groups (last sentence of previous child).
 ```
 
 **SmartRouter — element type determines strategy:**
@@ -301,32 +300,32 @@ Structural Parent-Child + Semantic children
 | **Table** | Always atomic | Split table = meaningless. Biggest single retrieval impact. |
 | **Figure** | Always atomic | Vision description is already one coherent unit |
 | **Code** | Always atomic | Split code = broken code |
-| **Title / Heading** | Not chunked — section metadata | Attached as `section_title` to following chunks |
-| **Text / List / Scanned** | Structural Parent-Child + Semantic children | See routing below |
+| **Title / Heading** | Not chunked — section boundary | Marks where a new parent starts |
+| **Text / List / Scanned** | Semantic Parent-Child | See below |
 
 **Text routing:**
 ```
 Has headings detected?
   Yes → heading boundaries as parents (structural)
-        semantic split within each section for children
-  No  → fixed parent size (800 words)
-        semantic split within each parent for children
+        paragraph-based children within each section
+  No  → paragraph-based parents (split at paragraph boundaries)
+        paragraph-based children within each parent
 
-Very short doc (< 20 chunks)?
-  → Single-level semantic only. No parent-child needed.
-    Whole doc fits in context anyway.
+SentenceSplitter handles oversized paragraphs — splits at sentence
+boundaries respecting abbreviations (Dr., e.g., D.C.), punctuation,
+and newlines.
 ```
 
 **Parent-Child explained:**
 ```
 Parent chunk (~800 words) — stored in PostgreSQL
-  The full section with all context.
+  One full document section with all context.
   What gets sent to the LLM.
 
-  ├── Child chunk A (~150 words) — stored in Qdrant (embedded)
-  ├── Child chunk B (~150 words) — stored in Qdrant (embedded)
-  └── Child chunk C (~150 words) — stored in Qdrant (embedded)
-        Small, precise. What gets searched.
+  ├── Child A (paragraph 1, ~120 words) — stored in Qdrant (embedded)
+  ├── Child B (paragraphs 2-3 merged, ~90 words) — stored in Qdrant
+  └── Child C (paragraph 4, ~180 words) — stored in Qdrant
+        Natural paragraph boundaries. Preserves document structure.
 
 Query time:
   1. Embed query → search Qdrant → Child B scores highest
@@ -338,14 +337,14 @@ Why: short children = precise retrieval.
      You index small, you retrieve large.
 ```
 
-**Chunk sizes by dataset (for eval notebooks):**
+**Configurable chunk size ranges:**
 
-| Dataset | Parent | Child | Notes |
-|---|---|---|---|
-| FinanceBench | 1000 words | 180 words | Financial sections can be long |
-| CUAD (contracts) | 1400 words | 100 words | Very specific questions need precise children |
-| DocVQA (scanned) | No parent | 200 words | Short docs — single level sufficient |
-| **Demo default** | **800 words** | **150 words** | **Works across all three** |
+| Parameter | Default | Purpose |
+|---|---|---|
+| `parent_min_words` | 200 | Merge small sections below this |
+| `parent_max_words` | 1200 | Split sections above this |
+| `child_min_words` | 50 | Merge small paragraphs below this |
+| `child_max_words` | 250 | Split paragraphs above this |
 
 **Contextual enrichment (highest ROI step):**
 ```python
@@ -653,7 +652,8 @@ docmind-rag/
 │       │   │   └── factory.py            ← .create() + .auto_select()
 │       │   │
 │       │   ├── chunkers/
-│       │   │   ├── parent_child_chunker.py
+│       │   │   ├── parent_child_chunker.py ← semantic section/paragraph chunking
+│       │   │   ├── sentence_splitter.py    ← sentence boundary detection
 │       │   │   ├── smart_router.py       ← routes by element type
 │       │   │   ├── enricher.py           ← contextual enrichment
 │       │   │   ├── quality_filter.py     ← remove noise before indexing
@@ -752,8 +752,7 @@ docmind-rag/
 | LLM Observability | Langfuse | Every LLM call: prompt, response, latency, cost | 3001 |
 | Structured Logs | Structlog → stdout | JSON logs with trace_id across all stages | — |
 
-Redis included as Celery broker. Query cache is roadmap.  
-Prometheus + Grafana are roadmap. Langfuse + logs sufficient for demo.
+Redis included as Celery broker. Query cache is roadmap.
 
 ### 6.2 Docker Compose Stack
 
@@ -836,45 +835,32 @@ Reproduce: eval/notebooks/01_baseline_eval.ipynb
 
 ---
 
-## 8. Implementation Plan
+## 8. What's Built & Roadmap
 
-3 weeks. Each week = a working, demonstrable vertical slice.
+### Built
 
-### Week 1 — Ingestion Pipeline
+| Layer | Components |
+|---|---|
+| **Parsing** | `DoclingParser`, `PyMuPDFParser`, `PDFPreprocessor`, `ElementNormalizer`, `ParserFactory` |
+| **Chunking** | `SmartRouter`, `ParentChildChunker` (semantic section/paragraph), `SentenceSplitter`, `ContextEnricher`, `QualityFilter` |
+| **Embedding** | `OpenAIEmbedder` (text-embedding-3-small) |
+| **LLM** | `ClaudeClient`, `OpenAIClient`, `LLMFactory` — switchable per query |
+| **Agent** | LangGraph: `query_analyzer`, `router`, `query_rewriter` (conditional HyDE), `AdaptiveRetriever` (retry loop), `IdentityReranker`, `GeneratorNode` (SSE streaming + citations) |
+| **Multimodal** | `FigureDescriber` (GPT-4o Vision), `TableRepresenter` (NL + markdown + HTML) |
+| **Eval** | RAGAS + `EvalService` + FinanceBench dataset |
+| **Frontend** | React Chat UI (streaming + citations + LLM toggle + agent trace), Document Manager, Upload Zone, Chunk Viewer |
+| **Infra** | Qdrant, PostgreSQL, Redis/Celery, MinIO, Langfuse, Prometheus + Grafana, Docker Compose |
+| **Auth** | JWT authentication (access + refresh tokens) |
 
-**Goal:** Upload a PDF → chunks in Qdrant with correct metadata.
+### Roadmap
 
-| Day | Task | Done When |
-|---|---|---|
-| 1 | All ABCs in `pipeline/base/`. `ParsedElement` + `Chunk` + `ElementType`. | Unit tests pass against all ABCs |
-| 2 | `PDFPreprocessor` + `DoclingParser` + `PyMuPDFParser` + `ElementNormalizer` + `ParserFactory` | Both parsers → `ParsedElement` from 3 test PDFs |
-| 3 | `SmartRouter` + `ParentChildChunker` + `ContextEnricher` + `QualityFilter` | Tables atomic, text parent-child, enrichment applied |
-| 4 | `OpenAIEmbedder` + `QdrantClient` + PostgreSQL parent store | Chunks indexed, parent retrievable by `parent_id` |
-| 5 | `IngestionService` + Celery task + `POST /upload` | Upload returns `doc_id`, chunks in Qdrant dashboard |
-
-### Week 2 — Agentic RAG Pipeline
-
-**Goal:** Ask a question → streamed answer with citations and agent trace.
-
-| Day | Task | Done When |
-|---|---|---|
-| 1 | `LLMFactory` + `ClaudeClient` + `OpenAIClient` + `prompts.py` | Both LLMs return same response schema |
-| 2 | LangGraph: `query_analyzer` + `router` + basic `retriever` | State flows through 3 nodes |
-| 3 | `query_rewriter` with conditional HyDE + `AdaptiveRetriever` with retry | HyDE skips on short queries. Retry logged in trace. |
-| 4 | `IdentityReranker` + `GeneratorNode` + SSE streaming + citations | Stream returns answer + sources |
-| 5 | FastAPI `/chat` SSE endpoint + `agent_trace` in META response | Full pipeline end-to-end |
-
-### Week 3 — Multimodal + Eval + Frontend
-
-**Goal:** Handle scanned/figures. Publish eval numbers. Working demo UI.
-
-| Day | Task | Done When |
-|---|---|---|
-| 1 | `FigureDescriber` (GPT-4o Vision) + `TableRepresenter` (NL + markdown + HTML) | Figures described, tables have 3 representations |
-| 2 | RAGAS + `EvalService` + Celery eval task + `POST /eval/run` | RAGAS runs on 50 synthetic questions |
-| 3 | FinanceBench download + `01_baseline_eval.ipynb` + `02_chunking_ablation.ipynb` | Committed results JSON, ablation shows tables-atomic gap |
-| 4 | React Chat: `MessageBubble` + `SourceCard` + `LLMToggle` + `AgentTrace` + SSE hook | Full chat in browser |
-| 5 | Upload zone + doc list + `seed_demo_data.py` + README eval table + demo GIF | `docker compose up` → working demo. Repo ready for proposals. |
+| Feature | Notes |
+|---|---|
+| `AzureDIParser` | Forms, invoices — Azure certs on CV |
+| BGE-M3 local embedder | Multilingual support |
+| `CohereReranker` | Cross-encoder reranking (identity passthrough now) |
+| Redis query cache | After basic pipeline is stable |
+| FinanceBench ablation notebook | Chunking ablation with committed results |
 
 ---
 

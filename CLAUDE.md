@@ -51,18 +51,22 @@ PDF/DOCX → PDFPreprocessor (deskew) → ParserFactory.auto_select() → Elemen
 - `pipeline/base/parser.py` → `BaseParser` — implementations: `DoclingParser`, `PyMuPDFParser`
 - `pipeline/base/chunker.py` → `BaseChunker` — implementation: `ParentChildChunker`
 - `pipeline/base/embedder.py` → `BaseEmbedder` — implementation: `OpenAIEmbedder`
-- `pipeline/base/retriever.py` → `BaseRetriever` — (Week 2)
-- `pipeline/base/reranker.py` → `BaseReranker` — (Week 2)
+- `pipeline/base/retriever.py` → `BaseRetriever` — implementation: `AdaptiveRetriever`
+- `pipeline/base/reranker.py` → `BaseReranker` — implementation: `IdentityReranker`
 
-### Parent-Child Chunking
+### Semantic Parent-Child Chunking
 
-Parents (~800 words) stored in PostgreSQL for LLM context window. Children (~150 words) embedded and stored in Qdrant for vector search. Atomic elements (tables, figures, code) are never split. Titles mark section boundaries.
+**Parents** are section-based (one heading = one parent). Sections < 200 words are merged, > 1200 words split at paragraph boundaries. Target ~800 words. Stored in PostgreSQL.
+
+**Children** are paragraph-based within each parent. Paragraphs < 50 words are merged, > 250 words split at sentence boundaries (via `SentenceSplitter`). Target ~150 words. Embedded in Qdrant.
+
+Atomic elements (tables, figures, code) are never split. Titles mark section boundaries. Sentence-based overlap between parent groups.
 
 ### Key Directories
 
 - `backend/app/core/` — Config (pydantic-settings), database (async SQLAlchemy), logging (structlog), exceptions
 - `backend/app/pipeline/parsers/` — DoclingParser, PyMuPDFParser, ParserFactory (auto-selects by file analysis), Preprocessor, Normalizer, MetadataExtractor
-- `backend/app/pipeline/chunkers/` — SmartRouter, ParentChildChunker, QualityFilter, ContextEnricher
+- `backend/app/pipeline/chunkers/` — SmartRouter, ParentChildChunker, SentenceSplitter, QualityFilter, ContextEnricher
 - `backend/app/services/ingestion.py` — Pipeline orchestrator (9 stages)
 - `backend/app/workers/` — Celery app + async ingest task
 - `backend/app/vectorstore/qdrant_client.py` — QdrantWrapper (upsert, search, delete, filtering)
@@ -78,8 +82,4 @@ Pydantic Settings loaded from `.env` file. See `.env.example` for required vars.
 
 ### Docker Services
 
-PostgreSQL on 5432 (user/pass/db: docmind), Qdrant on 6333, Redis on 6379. Uses custom registry `ai-docker-registry.dai-ichi-life.com.vn:5000/postgres:15-alpine`.
-
-### Known Refactor (Week 2)
-
-`ContextEnricher` and `MetadataExtractor` instantiate `AsyncOpenAI` directly. Will be refactored to accept `BaseLLMClient` via constructor injection once `ClaudeClient`/`OpenAIClient`/`LLMFactory` are built.
+PostgreSQL on 5432 (user/pass/db: docmind), Qdrant on 6333, Redis on 6379.
