@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     retrieval_score_threshold: float = 0.4
     retrieval_quality_threshold: float = 0.6
 
+    # Reranker
+    reranker_strategy: str = "identity"
+    cohere_api_key: str = ""
+    reranker_top_n: int = 5
+
     # HyDE
     hyde_model: str = "gpt-4o-mini"
     hyde_max_tokens: int = 150
