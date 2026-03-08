@@ -95,6 +95,23 @@ class QdrantWrapper:
         )
         logger.info("qdrant_delete_done", doc_id=doc_id)
 
+    async def get_by_doc_id(self, doc_id: str) -> list[dict]:
+        """Fetch all chunks for a document (for ChunkViewer)."""
+        try:
+            results = self._client.scroll(
+                collection_name=self._collection,
+                scroll_filter=Filter(
+                    must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+                ),
+                limit=1000,
+                with_payload=True,
+                with_vectors=False,
+            )
+            return [point.payload for point in results[0]]
+        except Exception as e:
+            logger.warning("qdrant_scroll_failed", error=str(e))
+            return []
+
     def _build_filter(self, filters: dict) -> Filter:
         conditions = []
 
