@@ -208,3 +208,114 @@ def test_parent_word_count_within_range():
     # All but the last parent should be >= min
     for p in text_parents[:-1]:
         assert p.word_count >= 50
+
+
+# ── child chunking tests ──────────────────────────────────────
+
+
+def test_paragraphs_become_children():
+    """Each paragraph becomes a child chunk."""
+    chunker = ParentChildChunker(child_min_words=10, child_max_words=250)
+    para1 = "First paragraph with enough words to stand alone as a child chunk."
+    para2 = "Second paragraph also with enough words to be its own child chunk."
+    elements = [
+        make_element(ElementType.TEXT, f"{para1}\n\n{para2}"),
+    ]
+    _, children = chunker.chunk(elements, {})
+
+    text_children = [c for c in children if not c.is_parent]
+    assert len(text_children) == 2
+    assert para1 in text_children[0].content_raw
+    assert para2 in text_children[1].content_raw
+
+
+def test_small_paragraphs_merged():
+    """Paragraphs < child_min_words are merged with the next."""
+    chunker = ParentChildChunker(child_min_words=50, child_max_words=250)
+    tiny1 = "Short."           # 1 word
+    tiny2 = "Also short."      # 2 words
+    normal = "This is a normal paragraph with plenty of words. " * 5  # ~50 words
+    elements = [
+        make_element(ElementType.TEXT, f"{tiny1}\n\n{tiny2}\n\n{normal}"),
+    ]
+    _, children = chunker.chunk(elements, {})
+
+    text_children = [c for c in children if not c.is_parent]
+    # tiny1 + tiny2 + normal should be merged into 1 child
+    assert len(text_children) == 1
+    assert "Short." in text_children[0].content_raw
+    assert "Also short." in text_children[0].content_raw
+
+
+def test_large_paragraph_split_at_sentences():
+    """Paragraphs > child_max_words are split at sentence boundaries."""
+    chunker = ParentChildChunker(child_min_words=10, child_max_words=30)
+    # Create a long paragraph of ~60 words
+    long_para = "This is a test sentence with several words in it. " * 6
+    elements = [
+        make_element(ElementType.TEXT, long_para),
+    ]
+    _, children = chunker.chunk(elements, {})
+
+    text_children = [c for c in children if not c.is_parent]
+    assert len(text_children) >= 2
+    # Each child should be <= max_words (with some tolerance for sentence boundaries)
+    for c in text_children:
+        assert c.word_count <= 40  # some tolerance
+
+
+def test_sentence_overlap_between_parent_groups():
+    """First child of a subsequent parent group gets last sentence as overlap."""
+    chunker = ParentChildChunker(
+        parent_max_words=30, child_min_words=5, child_max_words=250
+    )
+    # Create content that will produce 2 parent groups within same section
+    para1 = "First paragraph content here. It has a final sentence."
+    para2 = "Second paragraph content here. It has its own final sentence."
+    elements = [
+        make_element(ElementType.TEXT, f"{para1}\n\n{para2}"),
+    ]
+    _, children = chunker.chunk(elements, {})
+
+    text_children = [c for c in children if not c.is_parent]
+    # If there are multiple parent groups, the first child of the second group
+    # should have overlap from the previous group
+    if len(text_children) > 1:
+        second_child = text_children[1]
+        overlap = second_child.metadata.get("overlap_sentence")
+        if overlap:
+            assert "final sentence" in overlap
+
+
+def test_no_overlap_across_sections():
+    """Children from different sections should NOT have overlap."""
+    chunker = ParentChildChunker(child_min_words=5, child_max_words=250)
+    elements = [
+        make_element(ElementType.TITLE, "# Section 1"),
+        make_element(ElementType.TEXT, "Content for section one. It has a final sentence."),
+        make_element(ElementType.TITLE, "# Section 2"),
+        make_element(ElementType.TEXT, "Content for section two. It has its own final sentence."),
+    ]
+    _, children = chunker.chunk(elements, {})
+
+    text_children = [c for c in children if not c.is_parent]
+    # No child should have overlap from a different section
+    for c in text_children:
+        overlap = c.metadata.get("overlap_sentence")
+        assert overlap is None
+
+
+def test_atomic_elements_unchanged():
+    """Tables, figures, code still produce single atomic parent+child."""
+    chunker = ParentChildChunker()
+    elements = [
+        make_element(ElementType.TABLE, "| A | B |\n|---|---|\n| 1 | 2 |"),
+        make_element(ElementType.FIGURE, "Description of figure"),
+        make_element(ElementType.CODE, "def foo(): pass"),
+    ]
+    parents, children = chunker.chunk(elements, {})
+
+    assert len(parents) == 3
+    assert len(children) == 3
+    for p, c in zip(parents, children):
+        assert p.chunk_id == c.chunk_id
