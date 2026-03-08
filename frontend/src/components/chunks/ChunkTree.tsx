@@ -87,16 +87,17 @@ function ChildRow({ child }: { child: ChunkChild }) {
   const isSelected = selectedChunk?.chunk_id === child.chunk_id;
 
   // For children we create a minimal ChunkNode-compatible object for selectChunk
+  const text = child.content_raw || child.content || "";
   const asNode: ChunkNode = {
     chunk_id: child.chunk_id,
-    content_raw: child.content_raw,
+    content_raw: text,
     content_markdown: null,
     content_html: null,
     type: child.type,
     page: child.page,
     section: child.section,
     language: "",
-    word_count: child.content.split(/\s+/).length,
+    word_count: text.split(/\s+/).length,
     children: [],
   };
 
@@ -112,8 +113,8 @@ function ChildRow({ child }: { child: ChunkChild }) {
     >
       <TypeBadge type={child.type} />
       <span className="text-xs text-muted-foreground truncate flex-1">
-        {child.content.slice(0, 100)}
-        {child.content.length > 100 ? "..." : ""}
+        {text.slice(0, 100)}
+        {text.length > 100 ? "..." : ""}
       </span>
       <span className="text-[10px] text-muted-foreground shrink-0">
         p.{child.page}

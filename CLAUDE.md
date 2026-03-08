@@ -52,7 +52,7 @@ PDF/DOCX → PDFPreprocessor (deskew) → ParserFactory.auto_select() → Elemen
 - `pipeline/base/chunker.py` → `BaseChunker` — implementation: `ParentChildChunker`
 - `pipeline/base/embedder.py` → `BaseEmbedder` — implementation: `OpenAIEmbedder`
 - `pipeline/base/retriever.py` → `BaseRetriever` — implementation: `AdaptiveRetriever`
-- `pipeline/base/reranker.py` → `BaseReranker` — implementation: `IdentityReranker`
+- `pipeline/base/reranker.py` → `BaseReranker` — implementations: `IdentityReranker`, `CohereReranker`
 
 ### Semantic Parent-Child Chunking
 
@@ -64,13 +64,15 @@ Atomic elements (tables, figures, code) are never split. Titles mark section bou
 
 ### Key Directories
 
-- `backend/app/core/` — Config (pydantic-settings), database (async SQLAlchemy), logging (structlog), exceptions
-- `backend/app/pipeline/parsers/` — DoclingParser, PyMuPDFParser, ParserFactory (auto-selects by file analysis), Preprocessor, Normalizer, MetadataExtractor
+- `backend/app/api/` — HTTP routers: `auth.py` (JWT register/login/refresh), `documents.py`, `chat.py`, `chunks.py`, `dependencies.py` (get_current_user)
+- `backend/app/core/` — Config (pydantic-settings), database (async SQLAlchemy), logging (structlog), exceptions, `metrics.py` (Prometheus), `middleware.py` (HTTP metrics)
+- `backend/app/pipeline/parsers/` — DoclingParser, PyMuPDFParser, ParserFactory, Preprocessor, Normalizer, MetadataExtractor
 - `backend/app/pipeline/chunkers/` — SmartRouter, ParentChildChunker, SentenceSplitter, QualityFilter, ContextEnricher
-- `backend/app/services/ingestion.py` — Pipeline orchestrator (9 stages)
+- `backend/app/pipeline/rerankers/` — IdentityReranker, CohereReranker, RerankerFactory
+- `backend/app/services/` — `auth.py` (JWT + bcrypt), `ingestion.py` (9-stage pipeline), `rag.py`
 - `backend/app/workers/` — Celery app + async ingest task
 - `backend/app/vectorstore/qdrant_client.py` — QdrantWrapper (upsert, search, delete, filtering)
-- `backend/app/models/document.py` — Document + ParentChunk SQLAlchemy models
+- `backend/app/models/` — `document.py` (Document + ParentChunk), `user.py` (User with bcrypt)
 
 ### Async Everywhere
 
@@ -80,6 +82,14 @@ FastAPI + SQLAlchemy async + asyncpg. Celery tasks bridge sync→async via `asyn
 
 Pydantic Settings loaded from `.env` file. See `.env.example` for required vars. `OPENAI_API_KEY` is the only required key. Module-level singleton: `from backend.app.core.config import settings`.
 
+### Authentication
+
+JWT-based auth with access + refresh tokens. `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`. All document/chat/chunk endpoints require `Authorization: Bearer <token>`. Tokens stored in frontend `localStorage`.
+
+### Prometheus Metrics
+
+Exposed at `GET /metrics/`. Custom metrics: `http_request_duration_seconds`, `llm_request_duration_seconds`, `llm_tokens_total`, `ingestion_stage_duration_seconds`, `chunks_created_total`, `retrieval_duration_seconds`, `reranker_duration_seconds`. Grafana on port 3002.
+
 ### Docker Services
 
-PostgreSQL on 5432 (user/pass/db: docmind), Qdrant on 6333, Redis on 6379.
+PostgreSQL on 5432 (user/pass/db: docmind), Qdrant on 6333, Redis on 6379, Prometheus on 9090, Grafana on 3002.

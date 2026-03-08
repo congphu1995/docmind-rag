@@ -6,6 +6,7 @@ from backend.app.schemas.auth import (
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
+    TokenUser,
 )
 from backend.app.services.auth import AuthService
 
@@ -27,6 +28,7 @@ async def register(request: RegisterRequest):
     return TokenResponse(
         access_token=_auth.create_access_token(user.id, user.email),
         refresh_token=_auth.create_refresh_token(user.id),
+        user=TokenUser(email=user.email, username=user.username),
     )
 
 
@@ -39,6 +41,7 @@ async def login(request: LoginRequest):
     return TokenResponse(
         access_token=_auth.create_access_token(user.id, user.email),
         refresh_token=_auth.create_refresh_token(user.id),
+        user=TokenUser(email=user.email, username=user.username),
     )
 
 
@@ -55,4 +58,5 @@ async def refresh(request: RefreshRequest):
     return TokenResponse(
         access_token=_auth.create_access_token(user.id, user.email),
         refresh_token=_auth.create_refresh_token(user.id),
+        user=TokenUser(email=user.email, username=user.username),
     )

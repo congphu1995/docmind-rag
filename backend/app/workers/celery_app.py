@@ -14,4 +14,8 @@ celery_app.conf.update(
     task_track_started=True,
     task_soft_time_limit=600,
     task_time_limit=900,
+    include=[
+        "backend.app.workers.ingest_tasks",
+        "backend.app.workers.eval_tasks",
+    ],
 )

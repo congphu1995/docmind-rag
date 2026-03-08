@@ -13,10 +13,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class TokenUser(BaseModel):
+    email: str
+    username: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: TokenUser
 
 
 class RefreshRequest(BaseModel):

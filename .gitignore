@@ -11,3 +11,4 @@ dist/
 !tests/fixtures/*.pdf
 eval/datasets/*.json
 docs/
+!docs/UI_TESTING_GUIDE.md

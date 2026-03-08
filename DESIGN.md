@@ -20,7 +20,7 @@
 5. [Folder Structure](#5-folder-structure)
 6. [Infrastructure & Observability](#6-infrastructure--observability)
 7. [Evaluation Strategy](#7-evaluation-strategy)
-8. [Implementation Plan](#8-implementation-plan)
+8. [What's Built & Roadmap](#8-whats-built--roadmap)
 9. [Design Principles Reference](#9-design-principles-reference)
 
 ---
@@ -61,7 +61,6 @@ Frontend:  Chat UI (streaming + citations + LLM toggle + agent trace), Upload zo
 ```
 AzureDIParser                 roadmap — you have the Azure certs already
 BGE-M3 local embedder         roadmap — multilingual support
-CohereReranker                identity reranker now, Cohere later
 SelfCheckNode                 add after core pipeline is stable
 Redis query cache             add after basic pipeline works
 ```
@@ -463,11 +462,11 @@ Agent trace always records the decision:
 
 | Provider | Type | Status |
 |---|---|---|
-| **Identity** (default) | Passthrough — no reranking | Built now |
-| Cohere Rerank v3 | API cross-encoder, top-20 → top-5 | Roadmap |
+| **Identity** (default) | Passthrough — no reranking | Built |
+| **Cohere Rerank v3** | API cross-encoder, top-20 → top-N | Built |
 | BGE Reranker | Local cross-encoder | Roadmap |
 
-Identity reranker implements `BaseReranker` — swapping to Cohere is a config change.
+Both rerankers implement `BaseReranker`. Switch via `RERANKER_STRATEGY` config (`identity` or `cohere`). `RerankerFactory.create()` handles instantiation.
 
 ---
 
@@ -563,13 +562,19 @@ class RAGAgentState(TypedDict):
 
 | Endpoint | Method | Request | Response |
 |---|---|---|---|
-| `POST /api/v1/documents/upload` | multipart | `file`, `language?` | `{ doc_id, doc_name, chunks_indexed, language }` |
+| `POST /api/v1/auth/register` | JSON | `email, username, password` | `{ access_token, refresh_token, user }` |
+| `POST /api/v1/auth/login` | JSON | `email, password` | `{ access_token, refresh_token, user }` |
+| `POST /api/v1/auth/refresh` | JSON | `refresh_token` | `{ access_token, refresh_token }` |
+| `POST /api/v1/documents/upload` | multipart | `file`, `language?` | `{ doc_id, doc_name, task_id }` |
 | `GET /api/v1/documents/` | — | — | `{ documents: [...], total }` |
+| `GET /api/v1/documents/task/{taskId}` | — | — | `{ status, result }` |
+| `GET /api/v1/documents/{docId}/chunks` | — | `type_filter?, page_filter?, search?` | `[{ chunk_id, content_raw, children, ... }]` |
 | `DELETE /api/v1/documents/{id}` | — | — | `{ status, doc_id }` |
 | `POST /api/v1/chat/` | JSON | `question, llm?, doc_ids?, history?, stream?` | SSE stream |
 | `POST /api/v1/eval/run` | JSON | `dataset, sample_size?, config?` | `{ run_id }` async |
 | `GET /api/v1/eval/results/{run_id}` | — | — | `{ metrics: {...} }` |
 | `GET /api/v1/health` | — | — | `{ status, qdrant, postgres }` |
+| `GET /metrics/` | — | — | Prometheus metrics (text) |
 
 **SSE stream format:**
 ```
@@ -607,28 +612,36 @@ docmind-rag/
 │       ├── main.py
 │       │
 │       ├── api/                    ← HTTP routers ONLY — no business logic
+│       │   ├── auth.py             ← JWT register/login/refresh
 │       │   ├── documents.py
 │       │   ├── chat.py
+│       │   ├── chunks.py           ← chunk viewer API
 │       │   ├── eval.py
+│       │   ├── dependencies.py     ← get_current_user dependency
 │       │   └── health.py
 │       │
 │       ├── core/                   ← cross-cutting, imported everywhere
 │       │   ├── config.py           ← Pydantic Settings — ALL config here
 │       │   ├── database.py         ← SQLAlchemy async engine + session
 │       │   ├── exceptions.py       ← custom exception hierarchy
-│       │   └── logging.py          ← structlog + trace_id injection
+│       │   ├── logging.py          ← structlog + trace_id injection
+│       │   ├── metrics.py          ← Prometheus counters + histograms
+│       │   └── middleware.py       ← HTTP metrics middleware
 │       │
 │       ├── models/                 ← SQLAlchemy ORM
-│       │   ├── document.py         ← Document, DocumentChunk (parent store)
+│       │   ├── document.py         ← Document, ParentChunk (parent store)
+│       │   ├── user.py             ← User model (bcrypt hashed passwords)
 │       │   └── eval.py             ← EvalRun, EvalResult
 │       │
 │       ├── schemas/                ← Pydantic contracts
+│       │   ├── auth.py            ← TokenResponse, TokenUser, RegisterRequest
 │       │   ├── document.py
 │       │   ├── pipeline.py        ← structured output models (DocumentMetadata)
 │       │   ├── chat.py
 │       │   └── eval.py
 │       │
 │       ├── services/               ← business logic orchestration
+│       │   ├── auth.py             ← JWT create/verify, password hashing
 │       │   ├── ingestion.py        ← preprocess→parse→normalize→enrich→chunk→index
 │       │   ├── rag.py              ← agent invocation + response streaming
 │       │   └── eval.py             ← RAGAS runner + result storage
@@ -670,7 +683,8 @@ docmind-rag/
 │       │   │
 │       │   ├── rerankers/
 │       │   │   ├── identity_reranker.py  ← passthrough default
-│       │   │   └── factory.py            ← ready for Cohere later
+│       │   │   ├── cohere_reranker.py    ← Cohere Rerank v3
+│       │   │   └── factory.py            ← identity | cohere via config
 │       │   │
 │       │   └── multimodal/
 │       │       ├── figure_describer.py   ← GPT-4o Vision
@@ -700,26 +714,35 @@ docmind-rag/
 │   ├── package.json
 │   └── src/
 │       ├── pages/
+│       │   ├── Login.tsx
 │       │   ├── Chat.tsx
-│       │   └── Documents.tsx
+│       │   ├── Documents.tsx
+│       │   └── Chunks.tsx
 │       ├── components/
 │       │   ├── chat/
 │       │   │   ├── MessageBubble.tsx
 │       │   │   ├── SourceCard.tsx     ← expandable, confidence + page ref
 │       │   │   ├── AgentTrace.tsx     ← LangGraph decision steps
 │       │   │   └── LLMToggle.tsx      ← Claude ↔ GPT-4o
-│       │   └── documents/
-│       │       ├── UploadZone.tsx
-│       │       └── DocCard.tsx
+│       │   ├── documents/
+│       │   │   ├── UploadZone.tsx
+│       │   │   └── DocCard.tsx
+│       │   └── chunks/
+│       │       ├── ChunkTree.tsx       ← parent/child tree view
+│       │       └── ChunkDetail.tsx     ← metadata + content tabs
 │       ├── stores/
-│       │   ├── chatStore.ts           ← Zustand
+│       │   ├── authStore.ts            ← Zustand — JWT tokens, user
+│       │   ├── chatStore.ts            ← Zustand
+│       │   ├── chunkStore.ts           ← Zustand — chunk selection
 │       │   └── documentStore.ts
 │       ├── hooks/
-│       │   ├── useSSEChat.ts          ← SSE stream + META parsing
-│       │   └── useDocuments.ts
+│       │   ├── useSSEChat.ts           ← SSE stream + META parsing
+│       │   ├── useDocuments.ts
+│       │   └── useChunks.ts
 │       └── api/
-│           ├── client.ts
+│           ├── client.ts              ← axios + auth interceptor
 │           ├── documents.ts
+│           ├── chunks.ts
 │           └── chat.ts
 │
 ├── eval/
@@ -750,6 +773,8 @@ docmind-rag/
 | Object Storage | MinIO | Raw uploaded files — S3-compatible | 9000 |
 | Task Queue | Celery + Redis | Async ingestion — no HTTP timeout on large files | — |
 | LLM Observability | Langfuse | Every LLM call: prompt, response, latency, cost | 3001 |
+| Metrics | Prometheus | HTTP latency, LLM tokens, ingestion timing, retrieval | 9090 |
+| Dashboards | Grafana | Prometheus data visualization | 3002 |
 | Structured Logs | Structlog → stdout | JSON logs with trace_id across all stages | — |
 
 Redis included as Celery broker. Query cache is roadmap.
@@ -768,6 +793,8 @@ services:
   worker       #        Celery (same image, CMD=celery worker)
   frontend     # :3000  React + Vite
   langfuse     # :3001  LLM traces
+  prometheus   # :9090  Metrics scraping
+  grafana      # :3002  Dashboards (admin/admin)
 ```
 
 ---
@@ -845,7 +872,7 @@ Reproduce: eval/notebooks/01_baseline_eval.ipynb
 | **Chunking** | `SmartRouter`, `ParentChildChunker` (semantic section/paragraph), `SentenceSplitter`, `ContextEnricher`, `QualityFilter` |
 | **Embedding** | `OpenAIEmbedder` (text-embedding-3-small) |
 | **LLM** | `ClaudeClient`, `OpenAIClient`, `LLMFactory` — switchable per query |
-| **Agent** | LangGraph: `query_analyzer`, `router`, `query_rewriter` (conditional HyDE), `AdaptiveRetriever` (retry loop), `IdentityReranker`, `GeneratorNode` (SSE streaming + citations) |
+| **Agent** | LangGraph: `query_analyzer`, `router`, `query_rewriter` (conditional HyDE), `AdaptiveRetriever` (retry loop), `IdentityReranker` + `CohereReranker`, `GeneratorNode` (SSE streaming + citations) |
 | **Multimodal** | `FigureDescriber` (GPT-4o Vision), `TableRepresenter` (NL + markdown + HTML) |
 | **Eval** | RAGAS + `EvalService` + FinanceBench dataset |
 | **Frontend** | React Chat UI (streaming + citations + LLM toggle + agent trace), Document Manager, Upload Zone, Chunk Viewer |
@@ -858,9 +885,9 @@ Reproduce: eval/notebooks/01_baseline_eval.ipynb
 |---|---|
 | `AzureDIParser` | Forms, invoices — Azure certs on CV |
 | BGE-M3 local embedder | Multilingual support |
-| `CohereReranker` | Cross-encoder reranking (identity passthrough now) |
 | Redis query cache | After basic pipeline is stable |
 | FinanceBench ablation notebook | Chunking ablation with committed results |
+| `SelfCheckNode` | Answer verification after core pipeline is stable |
 
 ---
 

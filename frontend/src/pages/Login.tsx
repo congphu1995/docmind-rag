@@ -19,11 +19,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      if (mode === "register") {
-        await api.post("/auth/register", { email, username, password });
-      }
+      const endpoint = mode === "register" ? "/auth/register" : "/auth/login";
+      const body =
+        mode === "register"
+          ? { email, username, password }
+          : { email, password };
 
-      const { data } = await api.post("/auth/login", { email, password });
+      const { data } = await api.post(endpoint, body);
 
       useAuthStore.getState().login(data.access_token, data.refresh_token, {
         email: data.user.email,
