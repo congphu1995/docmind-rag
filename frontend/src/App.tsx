@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { MessageSquare, FileText, Moon, Sun, BrainCircuit, LogOut } from "lucide-react";
+import { MessageSquare, FileText, Layers, Moon, Sun, BrainCircuit, LogOut } from "lucide-react";
 import Chat from "./pages/Chat";
 import Documents from "./pages/Documents";
+import Chunks from "./pages/Chunks";
 import Login from "./pages/Login";
 import { useAuthStore } from "@/stores/authStore";
 
-type Page = "chat" | "documents";
+type Page = "chat" | "documents" | "chunks";
 
 export default function App() {
   const [page, setPage] = useState<Page>("chat");
@@ -57,6 +58,7 @@ export default function App() {
               [
                 { key: "chat", label: "Chat", icon: MessageSquare },
                 { key: "documents", label: "Documents", icon: FileText },
+                { key: "chunks", label: "Chunks", icon: Layers },
               ] as const
             ).map(({ key, label, icon: Icon }) => (
               <button
@@ -105,6 +107,7 @@ export default function App() {
       <main className="pt-16 h-screen">
         {page === "chat" && <Chat />}
         {page === "documents" && <Documents />}
+        {page === "chunks" && <Chunks />}
       </main>
     </div>
   );
