@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from backend.app.api.dependencies import get_current_user
 from backend.app.core.logging import logger
 from backend.app.schemas.chat import ChatRequest
 from backend.app.services.rag import RAGService
@@ -11,12 +12,10 @@ _rag_service = RAGService()
 
 
 @router.post("/")
-async def chat(request: ChatRequest):
-    """
-    Chat endpoint.
-    stream=true (default): SSE stream with META + tokens + [DONE]
-    stream=false: JSON response with full answer.
-    """
+async def chat(
+    request: ChatRequest,
+    user: dict = Depends(get_current_user),
+):
     try:
         if request.stream:
             return EventSourceResponse(
@@ -33,6 +32,5 @@ async def chat(request: ChatRequest):
 
 
 async def _stream_response(request: ChatRequest):
-    """Yield SSE events from RAGService.stream_query()."""
     async for event in _rag_service.stream_query(request):
         yield {"data": event}

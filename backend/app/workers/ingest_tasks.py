@@ -12,12 +12,13 @@ def ingest_document_task(
     doc_name: str,
     language: str = "en",
     parser_strategy: str = "auto",
+    user_id: str = None,
 ):
     """Async ingestion task — runs in Celery worker, not HTTP request."""
     try:
         service = IngestionService()
         result = asyncio.run(
-            service.ingest(file_path, doc_name, language, parser_strategy)
+            service.ingest(file_path, doc_name, language, parser_strategy, user_id=user_id)
         )
         return result
     except Exception as e:

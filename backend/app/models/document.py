@@ -13,6 +13,7 @@ class Document(Base):
 
     doc_id = Column(String, primary_key=True)
     doc_name = Column(String, nullable=False)
+    user_id = Column(String, nullable=True, index=True)
     file_path = Column(String)
     language = Column(String, default="en")
     doc_type = Column(String, default="document")
@@ -30,6 +31,7 @@ class ParentChunk(Base):
 
     chunk_id = Column(String, primary_key=True)
     doc_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=True, index=True)
     content_raw = Column(Text, nullable=False)
     content_markdown = Column(Text)
     content_html = Column(Text)

@@ -116,5 +116,11 @@ class QdrantWrapper:
                     key="type", match=MatchValue(value=filters["type"])
                 )
             )
+        if "user_id" in filters and filters["user_id"]:
+            conditions.append(
+                FieldCondition(
+                    key="user_id", match=MatchValue(value=filters["user_id"])
+                )
+            )
 
         return Filter(must=conditions) if conditions else None

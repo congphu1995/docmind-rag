@@ -46,6 +46,7 @@ class IngestionService:
         doc_name: str,
         language: str = "en",
         parser_strategy: str = "auto",
+        user_id: str = None,
     ) -> dict:
         doc_id = str(uuid.uuid4())[:12]
         log = logger.bind(doc_id=doc_id, doc_name=doc_name)
@@ -125,7 +126,7 @@ class IngestionService:
             # 9. Store parents in PostgreSQL
             log.info("stage_store_postgres")
             await self._store_parents(
-                doc_id, doc_name, parent_chunks, doc_metadata
+                doc_id, doc_name, parent_chunks, doc_metadata, user_id=user_id
             )
 
             result = {
@@ -154,12 +155,14 @@ class IngestionService:
         doc_name: str,
         parent_chunks: list,
         doc_metadata: dict,
+        user_id: str = None,
     ):
         async with AsyncSessionLocal() as session:
             # Store document record
             doc = Document(
                 doc_id=doc_id,
                 doc_name=doc_name,
+                user_id=user_id,
                 language=doc_metadata.get("language", "en"),
                 doc_type=doc_metadata.get("doc_type", "document"),
                 chunk_count=len(parent_chunks),
@@ -173,6 +176,7 @@ class IngestionService:
                 pg_chunk = ParentChunk(
                     chunk_id=chunk.chunk_id,
                     doc_id=doc_id,
+                    user_id=user_id,
                     content_raw=chunk.content_raw,
                     content_markdown=chunk.content_markdown,
                     content_html=chunk.content_html,

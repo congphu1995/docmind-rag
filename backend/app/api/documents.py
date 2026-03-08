@@ -1,9 +1,10 @@
 import os
 import tempfile
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
+from backend.app.api.dependencies import get_current_user
 from backend.app.core.logging import logger
 from backend.app.workers.ingest_tasks import ingest_document_task
 
@@ -18,6 +19,7 @@ async def upload_document(
     file: UploadFile = File(...),
     language: str = Form(default="en"),
     parser_strategy: str = Form(default="auto"),
+    user: dict = Depends(get_current_user),
 ):
     suffix = os.path.splitext(file.filename)[1].lower()
     if suffix not in ALLOWED_EXTENSIONS:
@@ -28,10 +30,7 @@ async def upload_document(
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail="File too large. Maximum size: 50MB",
-        )
+        raise HTTPException(status_code=413, detail="File too large. Maximum size: 50MB")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
@@ -41,6 +40,7 @@ async def upload_document(
         "upload_received",
         filename=file.filename,
         size_mb=round(len(content) / 1024 / 1024, 2),
+        user_id=user["user_id"],
     )
 
     task = ingest_document_task.delay(
@@ -48,6 +48,7 @@ async def upload_document(
         doc_name=file.filename,
         language=language,
         parser_strategy=parser_strategy,
+        user_id=user["user_id"],
     )
 
     return JSONResponse(
@@ -60,7 +61,10 @@ async def upload_document(
 
 
 @router.get("/task/{task_id}")
-async def get_task_status(task_id: str):
+async def get_task_status(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
     task = ingest_document_task.AsyncResult(task_id)
     if task.state == "SUCCESS":
         return {"status": "ready", "result": task.result}
@@ -71,14 +75,16 @@ async def get_task_status(task_id: str):
 
 
 @router.get("/")
-async def list_documents():
+async def list_documents(user: dict = Depends(get_current_user)):
     from sqlalchemy import select
 
     from backend.app.core.database import AsyncSessionLocal
     from backend.app.models.document import Document
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(Document))
+        result = await session.execute(
+            select(Document).where(Document.user_id == user["user_id"])
+        )
         docs = result.scalars().all()
     return {
         "documents": [
@@ -90,7 +96,25 @@ async def list_documents():
 
 
 @router.delete("/{doc_id}")
-async def delete_document(doc_id: str):
+async def delete_document(
+    doc_id: str,
+    user: dict = Depends(get_current_user),
+):
+    from sqlalchemy import select
+
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.models.document import Document
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Document).where(
+                Document.doc_id == doc_id,
+                Document.user_id == user["user_id"],
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Document not found")
+
     from backend.app.services.ingestion import IngestionService
 
     service = IngestionService()
