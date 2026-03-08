@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import make_asgi_app
 
 from backend.app.api import auth, chat, documents, eval, health
 from backend.app.core.database import create_tables
 from backend.app.core.logging import configure_logging
+from backend.app.core.middleware import PrometheusMiddleware
 
 
 @asynccontextmanager
@@ -27,6 +29,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(PrometheusMiddleware)
 
 app.include_router(
     documents.router, prefix="/api/v1/documents", tags=["documents"]
@@ -39,3 +42,7 @@ app.include_router(
 )
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+
+# Mount /metrics for Prometheus scraping
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
