@@ -44,8 +44,13 @@ async def test_openai_complete():
         mock_client = AsyncMock()
         mock_cls.return_value = mock_client
 
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 10
+        mock_usage.completion_tokens = 20
+
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Hello!"))]
+        mock_response.usage = mock_usage
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         from backend.app.pipeline.llm.openai_client import OpenAIClient
@@ -59,8 +64,13 @@ async def test_claude_complete():
         mock_client = AsyncMock()
         mock_cls.return_value = mock_client
 
+        mock_usage = MagicMock()
+        mock_usage.input_tokens = 10
+        mock_usage.output_tokens = 20
+
         mock_response = MagicMock()
         mock_response.content = [MagicMock(text="Hello from Claude!")]
+        mock_response.usage = mock_usage
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
         from backend.app.pipeline.llm.claude_client import ClaudeClient
