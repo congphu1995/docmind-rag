@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "docmind-backend"
+    static_configs:
+      - targets: ["backend:8000"]
+    metrics_path: /metrics
