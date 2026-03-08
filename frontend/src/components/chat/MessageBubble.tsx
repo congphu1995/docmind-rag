@@ -26,7 +26,7 @@ function processFootnotes(
 ): React.ReactNode {
   return React.Children.map(children, (child) => {
     if (typeof child === "string") {
-      const parts = child.split(/\[(\d+)\]/g);
+      const parts = child.split(/\[(?:Source\s*)?(\d+)\]/gi);
       if (parts.length === 1) return child;
       return parts.map((part, i) => {
         if (i % 2 === 1) {
