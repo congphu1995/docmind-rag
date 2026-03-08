@@ -1,20 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { MessageSquare, FileText, Moon, Sun, BrainCircuit } from "lucide-react";
+import { MessageSquare, FileText, Moon, Sun, BrainCircuit, LogOut } from "lucide-react";
 import Chat from "./pages/Chat";
 import Documents from "./pages/Documents";
+import Login from "./pages/Login";
+import { useAuthStore } from "@/stores/authStore";
 
 type Page = "chat" | "documents";
 
 export default function App() {
   const [page, setPage] = useState<Page>("chat");
   const [dark, setDark] = useState(false);
+  const { isAuthenticated, user, logout, loadFromStorage } = useAuthStore();
+
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
 
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
   };
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -65,14 +76,28 @@ export default function App() {
             ))}
           </div>
 
-          {/* Dark mode toggle */}
-          <button
-            onClick={toggleDark}
-            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-          >
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          {/* Right-side controls */}
+          <div className="flex items-center gap-1">
+            {user && (
+              <span className="text-xs text-muted-foreground mr-2 hidden sm:inline">
+                {user.username}
+              </span>
+            )}
+            <button
+              onClick={toggleDark}
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={logout}
+              aria-label="Log out"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </nav>
 

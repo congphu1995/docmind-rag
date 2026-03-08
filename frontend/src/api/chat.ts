@@ -33,9 +33,13 @@ export function streamChat(
     stream: true,
   });
 
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   fetch("/api/v1/chat/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body,
     signal: controller.signal,
   })
