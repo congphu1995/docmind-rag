@@ -11,21 +11,22 @@ from backend.app.pipeline.rerankers.factory import RerankerFactory
 async def reranker_node(state: RAGAgentState) -> dict:
     log = logger.bind(node="reranker")
 
-    reranker = RerankerFactory.create()
+    strategy = settings.reranker_strategy
+    reranker = RerankerFactory.create(strategy)
     chunks = state.get("retrieved_chunks", [])
 
     reranked = await reranker.rerank(
         query=state["original_query"],
         chunks=chunks,
-        top_n=settings.retrieval_top_n,
+        top_n=settings.reranker_top_n,
     )
 
-    log.info("reranked", before=len(chunks), after=len(reranked))
+    log.info("reranked", before=len(chunks), after=len(reranked), strategy=strategy)
 
     return {
         "reranked_chunks": reranked,
         "agent_trace": [
             f"Reranked: {len(chunks)} → {len(reranked)} chunks "
-            f"(strategy=identity)"
+            f"(strategy={strategy})"
         ],
     }

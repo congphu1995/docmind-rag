@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch, AsyncMock
 
 from backend.app.agent.nodes.reranker import reranker_node
 
@@ -47,3 +48,18 @@ async def test_reranker_handles_empty_chunks():
     state = _make_state(chunks=[])
     result = await reranker_node(state)
     assert result["reranked_chunks"] == []
+
+
+async def test_reranker_node_uses_configured_strategy():
+    chunks = [{"content": f"chunk {i}", "score": 0.9} for i in range(10)]
+    state = _make_state(chunks=chunks)
+
+    mock_reranker = AsyncMock()
+    mock_reranker.rerank.return_value = chunks[:3]
+
+    with patch(
+        "backend.app.agent.nodes.reranker.RerankerFactory"
+    ) as mock_factory:
+        mock_factory.create.return_value = mock_reranker
+        result = await reranker_node(state)
+        mock_factory.create.assert_called_once()
