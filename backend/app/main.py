@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import chat, documents, eval, health
+from backend.app.api import auth, chat, documents, eval, health
 from backend.app.core.database import create_tables
 from backend.app.core.logging import configure_logging
 
@@ -38,3 +38,4 @@ app.include_router(
     eval.router, prefix="/api/v1/eval", tags=["eval"]
 )
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
