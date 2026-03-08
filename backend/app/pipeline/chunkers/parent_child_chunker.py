@@ -23,10 +23,22 @@ class ParentChildChunker(BaseChunker):
         child_min_words: int | None = None,
         child_max_words: int | None = None,
     ):
-        self.parent_min_words = parent_min_words if parent_min_words is not None else settings.parent_min_words
-        self.parent_max_words = parent_max_words if parent_max_words is not None else settings.parent_max_words
-        self.child_min_words = child_min_words if child_min_words is not None else settings.child_min_words
-        self.child_max_words = child_max_words if child_max_words is not None else settings.child_max_words
+        self.parent_min_words = (
+            parent_min_words
+            if parent_min_words is not None
+            else settings.parent_min_words
+        )
+        self.parent_max_words = (
+            parent_max_words
+            if parent_max_words is not None
+            else settings.parent_max_words
+        )
+        self.child_min_words = (
+            child_min_words if child_min_words is not None else settings.child_min_words
+        )
+        self.child_max_words = (
+            child_max_words if child_max_words is not None else settings.child_max_words
+        )
 
     # ── public API ──────────────────────────────────────────────
 
@@ -49,9 +61,7 @@ class ParentChildChunker(BaseChunker):
                 all_parents.append(atomic)
                 all_children.append(atomic)
             else:
-                parents, children = self._build_parent_children(
-                    section, doc_metadata
-                )
+                parents, children = self._build_parent_children(section, doc_metadata)
                 all_parents.extend(parents)
                 all_children.extend(children)
 
@@ -59,9 +69,7 @@ class ParentChildChunker(BaseChunker):
 
     # ── section collection ──────────────────────────────────────
 
-    def _collect_sections(
-        self, elements: list[ParsedElement]
-    ) -> list[dict]:
+    def _collect_sections(self, elements: list[ParsedElement]) -> list[dict]:
         """
         Walk elements, group by title boundaries.
         Returns list of section dicts:
@@ -75,37 +83,45 @@ class ParentChildChunker(BaseChunker):
         for el in elements:
             if el.is_structural_boundary():
                 if current_elements:
-                    sections.append({
-                        "title": current_title,
-                        "elements": current_elements,
-                        "atomic": None,
-                    })
+                    sections.append(
+                        {
+                            "title": current_title,
+                            "elements": current_elements,
+                            "atomic": None,
+                        }
+                    )
                     current_elements = []
                 current_title = el.content.strip("# ").strip()
 
             elif el.is_atomic():
                 if current_elements:
-                    sections.append({
-                        "title": current_title,
-                        "elements": current_elements,
-                        "atomic": None,
-                    })
+                    sections.append(
+                        {
+                            "title": current_title,
+                            "elements": current_elements,
+                            "atomic": None,
+                        }
+                    )
                     current_elements = []
-                sections.append({
-                    "title": current_title,
-                    "elements": [],
-                    "atomic": el,
-                })
+                sections.append(
+                    {
+                        "title": current_title,
+                        "elements": [],
+                        "atomic": el,
+                    }
+                )
 
             else:
                 current_elements.append(el)
 
         if current_elements:
-            sections.append({
-                "title": current_title,
-                "elements": current_elements,
-                "atomic": None,
-            })
+            sections.append(
+                {
+                    "title": current_title,
+                    "elements": current_elements,
+                    "atomic": None,
+                }
+            )
 
         return sections
 
@@ -155,7 +171,9 @@ class ParentChildChunker(BaseChunker):
     # ── parent + child creation ─────────────────────────────────
 
     def _build_parent_children(
-        self, section: dict, doc_metadata: dict,
+        self,
+        section: dict,
+        doc_metadata: dict,
     ) -> tuple[list[Chunk], list[Chunk]]:
         """Build parents and children from a text section."""
         elements = section["elements"]
@@ -221,7 +239,11 @@ class ParentChildChunker(BaseChunker):
                     metadata={
                         **doc_metadata,
                         "chunk_index": i,
-                        **({"overlap_sentence": overlap_sentence} if overlap_sentence else {}),
+                        **(
+                            {"overlap_sentence": overlap_sentence}
+                            if overlap_sentence
+                            else {}
+                        ),
                     },
                 )
                 all_children.append(child)
@@ -242,7 +264,8 @@ class ParentChildChunker(BaseChunker):
         return [p.strip() for p in raw if p.strip()]
 
     def _group_paragraphs_into_parents(
-        self, paragraphs: list[str],
+        self,
+        paragraphs: list[str],
     ) -> list[list[str]]:
         """Group paragraphs into parent-sized groups respecting max_words."""
         if not paragraphs:
