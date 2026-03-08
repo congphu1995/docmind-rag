@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { MessageSquare, FileText, Moon, Sun } from "lucide-react";
+import { MessageSquare, FileText, Moon, Sun, BrainCircuit } from "lucide-react";
 import Chat from "./pages/Chat";
 import Documents from "./pages/Documents";
 
@@ -30,7 +30,7 @@ export default function App() {
           {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md shadow-primary/20">
-              <span className="text-sm font-bold text-primary-foreground">D</span>
+              <BrainCircuit className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="leading-tight">
               <span className="text-base font-semibold tracking-tight block">DocMind</span>

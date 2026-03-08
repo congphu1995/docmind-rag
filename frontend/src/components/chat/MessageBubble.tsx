@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { BrainCircuit } from "lucide-react";
 import type { Message } from "@/stores/chatStore";
 import type { ChatMeta } from "@/api/chat";
 import ThinkingIndicator from "./ThinkingIndicator";
@@ -83,7 +84,7 @@ export default function MessageBubble({ message, index }: Props) {
         <div className="flex gap-3">
           {/* Avatar */}
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="text-xs font-semibold text-primary">D</span>
+            <BrainCircuit className="w-4 h-4 text-primary" />
           </div>
 
           {/* Content */}
