@@ -12,6 +12,10 @@ import json
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env so OPENAI_API_KEY is available for langchain_openai
+
 MANIFEST_PATH = Path("eval/datasets/seed_manifest.json")
 RESULTS_PATH = Path("eval/results/financebench_results.json")
 SAMPLE_SIZE = 30
@@ -131,16 +135,19 @@ def calculate_hit_rate(results: list[dict]) -> float:
 
 async def compute_ragas_metrics(results: list[dict]) -> dict:
     try:
-        from ragas import EvaluationDataset, SingleTurnSample, evaluate
-        from ragas.metrics import (
-            AnswerRelevancy,
-            ContextRecall,
-            Faithfulness,
-        )
-        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+        import os
+        import warnings
 
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+        from ragas import EvaluationDataset, SingleTurnSample, evaluate
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from ragas.metrics import AnswerRelevancy, ContextRecall, Faithfulness
+
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=api_key)
 
         samples = [
             SingleTurnSample(
@@ -167,10 +174,15 @@ async def compute_ragas_metrics(results: list[dict]) -> dict:
 
         ragas_result = evaluate(dataset=dataset, metrics=metrics)
 
+        def safe_round(val, digits=4):
+            if isinstance(val, list):
+                val = sum(v for v in val if v is not None) / max(len(val), 1)
+            return round(float(val), digits) if val is not None else 0.0
+
         return {
-            "faithfulness": round(ragas_result["faithfulness"], 4),
-            "answer_relevancy": round(ragas_result["answer_relevancy"], 4),
-            "context_recall": round(ragas_result["context_recall"], 4),
+            "faithfulness": safe_round(ragas_result["faithfulness"]),
+            "answer_relevancy": safe_round(ragas_result["answer_relevancy"]),
+            "context_recall": safe_round(ragas_result["context_recall"]),
         }
     except Exception as e:
         print(f"WARNING: RAGAS metrics failed: {e}")

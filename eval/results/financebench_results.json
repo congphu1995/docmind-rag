@@ -1,0 +1,112 @@
+{
+  "dataset": "financebench",
+  "config": "default (parent-child 800/150, enrichment, tables atomic)",
+  "metrics": {
+    "retrieval_hit_rate": 0.8889,
+    "faithfulness": 0.0927,
+    "answer_relevancy": 0.6301,
+    "context_recall": 0.0,
+    "latency_p95_ms": 34935.4,
+    "sample_size": 9
+  },
+  "per_question": [
+    {
+      "question": "By drawing conclusions from the information stated only in the income statement, what is Amazon's FY2019 net income attributable to shareholders (in USD millions)?",
+      "ground_truth": "$11588.00",
+      "generated_answer": "Amazon's net income attributable to shareholders for the fiscal year 2019 is $11,588 million [Source 1].",
+      "contexts": [
+        "Company\u2019s correspondence with such tax authorities and evaluating the underlying facts upon which the tax positions are based. We\n\nused our knowledge of, and experience with, international, transfer p"
+      ],
+      "relevant_found": true,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "What is Coca Cola's FY2022 dividend payout ratio (using total cash dividends paid and net income attributable to shareholders)? Round answer to two decimal places. Answer the question asked by assuming you only have access to information clearly displayed in the cash flow statement and the income statement.",
+      "ground_truth": "0.8",
+      "generated_answer": "The provided context does not contain specific figures for Coca-Cola's total cash dividends paid or net income attributable to shareholders for FY2022. Therefore, I cannot calculate the dividend payout ratio based on the available information. You would need to refer to Coca-Cola's consolidated statements of cash flows and income statement for these specific figures.",
+      "contexts": [],
+      "relevant_found": false,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "Has Microsoft increased its debt on balance sheet between FY2023 and the FY2022 period?",
+      "ground_truth": "No. Microsoft decreased its debt by $2.5bn in FY 2023 vs FY 2022.",
+      "generated_answer": "Microsoft's total debt decreased from FY2022 to FY2023. As of June 30, 2023, the total face value of Microsoft's debt was $52,866 million, compared to $55,511 million as of June 30, 2022. This indicates a reduction in the total debt on the balance sheet over the period [Source 2].",
+      "contexts": [
+        "achieved from the integration of ZeniMax. None of the goodwill is expected to be deductible for income tax purposes.\n\nFollowing are details of the purchase price allocated to the intangible assets acq"
+      ],
+      "relevant_found": true,
+      "query_type": "analytical",
+      "hyde_used": true
+    },
+    {
+      "question": "Among operations, investing, and financing activities, which brought in the most (or lost the least) cash flow for Nike in FY2023?",
+      "ground_truth": "Among the three, cash flow from operations was the highest for Nike in FY2023.",
+      "generated_answer": "In fiscal year 2023, among operations, investing, and financing activities, the activity that brought in the most cash flow for Nike was operations. Cash provided by operations was an inflow of $5,841 million for fiscal 2023 [Source 1]. In contrast, cash provided by investing activities was an inflow of $564 million, and cash used by financing activities was an outflow of $7,447 million for the same period [Source 1]. Therefore, operations generated the highest cash inflow for Nike in FY2023.",
+      "contexts": [
+        "We are also exposed to the impact of foreign exchange fluctuations on our investments in wholly-owned foreign subsidiaries\n\ndenominated in a currency other than the U.S. Dollar, which could adversely "
+      ],
+      "relevant_found": true,
+      "query_type": "analytical",
+      "hyde_used": true
+    },
+    {
+      "question": "What are the geographies that Pepsico primarily operates in as of FY2022?",
+      "ground_truth": "As of FY2022, Pepsico primarily operates in the following geographies: North America, Latin America, Europe, Africa, Middle East, South Asia, Asia Pacific, Australia, New Zealand and China.",
+      "generated_answer": "PepsiCo primarily operates in the United States, Mexico, Russia, Canada, China, the United Kingdom, and South Africa as of FY2022 [Source 3].",
+      "contexts": [
+        "7) Asia Pacific, Australia, and New Zealand and China region (APAC), which includes all of our beverage and convenient\n\nfood businesses in Asia Pacific, Australia and New Zealand, and China region.\n\nT"
+      ],
+      "relevant_found": true,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "Has Pepsico reported any materially important ongoing legal battles from FY2022 and FY2021?",
+      "ground_truth": "No, Pepsico is not involved in material legal battles.",
+      "generated_answer": "PepsiCo has not reported any materially important ongoing legal battles from FY2022 and FY2021. The company and its subsidiaries are involved in a variety of litigation, claims, legal or regulatory proceedings, inquiries, and investigations. However, management believes that the final outcome of these matters will not have a material adverse effect on PepsiCo's financial condition, results of operations, or cash flows [Source 1].",
+      "contexts": [
+        "infringed, and could in the future infringe or be alleged to infringe, on the intellectual property rights of others. Such\n\ninfringement or allegations of infringement could result in expensive litiga"
+      ],
+      "relevant_found": true,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "What is the quantity of restructuring costs directly outlined in Pepsico's income statements for FY2022? If restructuring costs are not explicitly outlined then state 0.",
+      "ground_truth": "Pepsico's restructuring costs in FY2022 amounted to $411 million .",
+      "generated_answer": "The restructuring costs directly outlined in PepsiCo's income statements for FY2022 are $411 million. This amount is detailed under the \"Total restructuring and impairment charges\" for the year 2022 [Source 1].",
+      "contexts": [
+        "Amortizable intangible assets are only evaluated for impairment upon a significant change in the operating or macroeconomic\n\nenvironment. If an evaluation of the undiscounted future cash flows indicat"
+      ],
+      "relevant_found": true,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "What is the FY2022 unadjusted EBITDA less capex for PepsiCo? Define unadjusted EBITDA as unadjusted operating income + depreciation and amortization [from cash flow statement]. Answer in USD millions. Respond to the question by assuming the perspective of an investment analyst who can only use the details shown within the statement of cash flows and the income statement.",
+      "ground_truth": "$9068.00",
+      "generated_answer": "The context provided does not contain specific figures for PepsiCo's unadjusted EBITDA or operating income for FY2022. However, we can calculate the unadjusted EBITDA less capex using the available information on depreciation and amortization, capital expenditures, and operating profit.\n\n1. **Depreciation and Amortization**: The total depreciation and other amortization for 2022 is $2,685 million [Source 2].\n\n2. **Capital Expenditures (Capex)**: The capital spending for 2022 is $5,207 million [Source 3].\n\n3. **Operating Income**: The context does not provide a direct figure for operating income. However, operating profit is typically reported in the income statement, which is not included in the provided context.\n\nTo calculate unadjusted EBITDA less capex, we need the operating income figure, which is not available in the provided context. Therefore, we cannot compute the unadjusted EBITDA less capex without additional information on operating income.\n\nIf you have access to the income statement or any additional details regarding operating income, please provide them for a more accurate calculation.",
+      "contexts": [
+        "A summary of pre-tax impairment charges taken in 2022 as a result of our quantitative assessments of certain of our indefinitelived intangible assets is as follows:\n\n**Other impairment charges**\n\n**Im",
+        "extension of payment terms. Our current payment terms with a majority of our suppliers generally range from 60 to 90 days,\n\nwhich we deem to be commercially reasonable. We will continue to monitor eco"
+      ],
+      "relevant_found": true,
+      "query_type": "factual",
+      "hyde_used": false
+    },
+    {
+      "question": "What is the FY2022 unadjusted EBITDA % margin for PepsiCo? Calculate unadjusted EBITDA using unadjusted operating income and D&A (from cash flow statement). Give a response to the question by relying on the details shown in the statement of cash flows and the P&L statement.",
+      "ground_truth": "16.5%",
+      "generated_answer": "To calculate the FY2022 unadjusted EBITDA % margin for PepsiCo, we need to determine the unadjusted EBITDA and then divide it by the net revenue.\n\n1. **Unadjusted Operating Income (Operating Profit):**  \n   - For FY2022, the operating profit is $11,512 million [Source 2].\n\n2. **Depreciation and Amortization (D&A):**  \n   - For FY2022, the depreciation and amortization expense is $2,763 million [Source 2].\n\n3. **Unadjusted EBITDA Calculation:**  \n   - Unadjusted EBITDA = Operating Profit + Depreciation and Amortization  \n   - Unadjusted EBITDA = $11,512 million + $2,763 million = $14,275 million\n\n4. **Net Revenue:**  \n   - For FY2022, the net revenue is $86,392 million [Source 2].\n\n5. **Unadjusted EBITDA % Margin Calculation:**  \n   - Unadjusted EBITDA % Margin = (Unadjusted EBITDA / Net Revenue) * 100  \n   - Unadjusted EBITDA % Margin = ($14,275 million / $86,392 million) * 100 \u2248 16.52%\n\nTherefore, the FY2022 unadjusted EBITDA % margin for PepsiCo is approximately 16.52% [Source 2].",
+      "contexts": [
+        "benefit plans. A 25-basis-point decrease in each of the above discount rates and expected rate of return assumptions would\n\nindividually increase 2023 pre-tax pension and retiree medical expense as fo"
+      ],
+      "relevant_found": true,
+      "query_type": "multi_hop",
+      "hyde_used": true
+    }
+  ]
+}

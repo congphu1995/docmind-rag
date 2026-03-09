@@ -16,12 +16,13 @@ EVAL_USER_EMAIL = "eval@docmind.system"
 EVAL_USER_NAME = "eval_system"
 MANIFEST_PATH = Path("eval/datasets/seed_manifest.json")
 
+# Must match exact doc_name values from PatronusAI/financebench dataset
 FINANCEBENCH_DOCS = [
-    {"doc_name": "AAPL_10K_2023.pdf", "hf_doc_name": "APPLE INC"},
-    {"doc_name": "MSFT_10K_2023.pdf", "hf_doc_name": "MICROSOFT CORP"},
-    {"doc_name": "AMZN_10K_2023.pdf", "hf_doc_name": "AMAZON COM INC"},
-    {"doc_name": "GOOG_10K_2023.pdf", "hf_doc_name": "ALPHABET INC"},
-    {"doc_name": "META_10K_2023.pdf", "hf_doc_name": "META PLATFORMS INC"},
+    "MICROSOFT_2023_10K",
+    "AMAZON_2019_10K",
+    "COCACOLA_2022_10K",
+    "NIKE_2023_10K",
+    "PEPSICO_2022_10K",
 ]
 
 
@@ -54,76 +55,47 @@ async def get_or_create_eval_user() -> str:
 
 
 async def download_financebench_pdfs(tmp_dir: Path) -> list[dict]:
+    import httpx
+    from datasets import load_dataset
+
+    ds = load_dataset("PatronusAI/financebench", split="train")
+
+    # Collect unique doc_link per target doc_name
+    targets = set(FINANCEBENCH_DOCS)
+    links: dict[str, str] = {}
+    for item in ds:
+        doc_name = item.get("doc_name", "")
+        doc_link = item.get("doc_link", "")
+        if doc_name in targets and doc_link and doc_name not in links:
+            links[doc_name] = doc_link
+        if len(links) == len(targets):
+            break
+
+    missing = targets - set(links.keys())
+    if missing:
+        raise RuntimeError(f"Could not find doc_links for: {missing}")
+
     docs = []
-    try:
-        from datasets import load_dataset
+    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+        for doc_name, doc_link in links.items():
+            pdf_path = tmp_dir / f"{doc_name}.pdf"
+            print(f"  Downloading {doc_name}...")
+            r = await client.get(doc_link)
+            if r.status_code != 200 or len(r.content) < 1000:
+                raise RuntimeError(
+                    f"Download failed for {doc_name}: "
+                    f"status={r.status_code}, size={len(r.content)}"
+                )
+            pdf_path.write_bytes(r.content)
+            docs.append(
+                {
+                    "doc_name": f"{doc_name}.pdf",
+                    "hf_doc_name": doc_name,
+                    "path": str(pdf_path),
+                }
+            )
+            print(f"    OK ({len(r.content) // 1024} KB)")
 
-        ds = load_dataset("PatronusAI/financebench", split="train")
-
-        seen = set()
-        for item in ds:
-            doc_name = item.get("doc_name", "")
-            doc_link = item.get("doc_link", "")
-            if doc_link and doc_name not in seen:
-                for target in FINANCEBENCH_DOCS:
-                    if target["hf_doc_name"].lower() in doc_name.lower():
-                        seen.add(doc_name)
-                        pdf_path = tmp_dir / target["doc_name"]
-                        if not pdf_path.exists():
-                            import httpx
-
-                            print(f"  Downloading {target['doc_name']}...")
-                            try:
-                                async with httpx.AsyncClient(
-                                    timeout=120, follow_redirects=True
-                                ) as client:
-                                    r = await client.get(doc_link)
-                                    if r.status_code == 200 and len(r.content) > 1000:
-                                        pdf_path.write_bytes(r.content)
-                                        docs.append(
-                                            {
-                                                "doc_name": target["doc_name"],
-                                                "hf_doc_name": doc_name,
-                                                "path": str(pdf_path),
-                                            }
-                                        )
-                                    else:
-                                        print(
-                                            f"    Skip: status={r.status_code}, size={len(r.content)}"
-                                        )
-                            except Exception as e:
-                                print(f"    Download failed: {e}")
-                        break
-            if len(docs) >= 5:
-                break
-    except Exception as e:
-        print(f"FinanceBench download failed: {e}")
-
-    if not docs:
-        print("Creating synthetic seed documents as fallback...")
-        docs = create_synthetic_docs(tmp_dir)
-
-    return docs
-
-
-def create_synthetic_docs(tmp_dir: Path) -> list[dict]:
-    docs = []
-    for i, company in enumerate(
-        ["Acme Corp", "Beta Inc", "Gamma LLC", "Delta Co", "Echo Ltd"]
-    ):
-        path = tmp_dir / f"synthetic_{i + 1}.txt"
-        path.write_text(
-            f"{company} Annual Report 2023\n\n"
-            f"Financial Overview\n"
-            f"Total revenue for fiscal year 2023 was ${(i + 1) * 10}B.\n"
-            f"Operating income was ${(i + 1) * 2}B.\n\n"
-            f"Business Segments\n"
-            f"{company} operates in {i + 2} segments globally.\n"
-            f"The largest segment contributed {50 + i * 5}% of revenue.\n\n"
-            f"Risk Factors\n"
-            f"Key risks include market competition and regulatory changes.\n"
-        )
-        docs.append({"doc_name": path.name, "path": str(path), "hf_doc_name": company})
     return docs
 
 
