@@ -2,13 +2,13 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make the RAG evaluation pipeline work end-to-end: seed FinanceBench docs, fix RAGAS v0.4 API, scope eval to seeded docs, update notebooks, produce committed result JSON.
+**Goal:** Make the RAG evaluation pipeline work end-to-end: seed FinanceBench docs, fix RAGAS v0.4 API, run eval via script, produce committed result JSON, notebook for visualization only.
 
-**Architecture:** Pre-seed 5 FinanceBench 10-K PDFs under a system "eval" user. EvalService loads the seed manifest to get `doc_ids`, passes them in `ChatRequest` so retrieval is scoped. RAGAS v0.4.3 class-based API computes faithfulness, answer relevancy, and context recall. Notebooks call the HTTP API, poll for results, and save JSON.
+**Architecture:** Pre-seed 5 FinanceBench 10-K PDFs under a system "eval" user. `eval/run_eval.py` script calls RAGService directly (no HTTP, no Celery), computes RAGAS metrics, saves JSON. Notebook loads the JSON and renders formatted results for GitHub display. Remove eval API endpoint and Celery task — they add complexity with no value.
 
-**Tech Stack:** RAGAS v0.4.3, langchain-openai (for RAGAS LLM/embeddings), HuggingFace datasets, httpx (notebooks)
+**Tech Stack:** RAGAS v0.4.3, langchain-openai (for RAGAS LLM/embeddings), HuggingFace datasets
 
-> **Depends on:** Ingestion pipeline, RAGService, auth system, Celery worker — all already built.
+> **Depends on:** Ingestion pipeline, RAGService, auth system — all already built.
 
 ---
 
@@ -43,7 +43,6 @@ git commit -m "chore: add langchain-openai for RAGAS eval metrics"
 
 **Files:**
 - Rewrite: `scripts/seed_demo_data.py`
-- Modify: `Makefile`
 
 **Step 1: Write the seed script**
 
@@ -258,16 +257,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-**Step 2: Update Makefile `seed` target**
-
-The existing `make seed` already points to `scripts/seed_demo_data.py` — no change needed.
-
-**Step 3: Run to verify it starts**
+**Step 2: Verify syntax**
 
 Run: `uv run python -c "from scripts.seed_demo_data import FINANCEBENCH_DOCS; print(len(FINANCEBENCH_DOCS))"`
 Expected: `5`
 
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
 git add scripts/seed_demo_data.py
@@ -276,563 +271,407 @@ git commit -m "feat: seed script — eval user + FinanceBench PDF download + ing
 
 ---
 
-## Task 3: Update RAGAS Metrics to v0.4.3 API
+## Task 3: Create Eval Runner Script
 
 **Files:**
-- Modify: `backend/app/services/eval.py`
-- Modify: `tests/unit/test_eval_service.py`
+- Create: `eval/run_eval.py`
 
-**Step 1: Write the test for the new RAGAS integration**
+**Step 1: Write the eval script**
 
-Add to `tests/unit/test_eval_service.py`:
-
-```python
-async def test_compute_ragas_builds_correct_samples():
-    """Verify RAGAS sample construction uses correct field names."""
-    service = EvalService.__new__(EvalService)
-    results = [
-        {
-            "question": "What was revenue?",
-            "generated_answer": "Revenue was $100B.",
-            "ground_truth": "$100B",
-            "contexts": ["Revenue section: total revenue was $100B."],
-        }
-    ]
-    # Should not raise — validates sample construction
-    # We mock evaluate() to avoid actual LLM calls
-    with patch("backend.app.services.eval.evaluate") as mock_eval:
-        mock_eval.return_value = {
-            "faithfulness": 0.9,
-            "answer_relevancy": 0.85,
-            "context_recall": 0.8,
-        }
-        metrics = await service._compute_ragas_metrics(results)
-        assert metrics["faithfulness"] == 0.9
-        assert metrics["answer_relevancy"] == 0.85
-        assert metrics["context_recall"] == 0.8
-        mock_eval.assert_called_once()
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `uv run pytest tests/unit/test_eval_service.py::test_compute_ragas_builds_correct_samples -v`
-Expected: FAIL — import path or API mismatch
-
-**Step 3: Rewrite `_compute_ragas_metrics` in `backend/app/services/eval.py`**
-
-Replace the `_compute_ragas_metrics` method (lines 129-163) with:
+Create `eval/run_eval.py`:
 
 ```python
-    async def _compute_ragas_metrics(self, results: list[dict]) -> dict:
-        """Compute RAGAS metrics using v0.4.3 class-based API."""
-        try:
-            from ragas import EvaluationDataset, SingleTurnSample, evaluate
-            from ragas.metrics import (
-                AnswerRelevancy,
-                ContextRecall,
-                Faithfulness,
-            )
-            from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+#!/usr/bin/env python3
+"""
+Run RAG evaluation against seeded FinanceBench documents.
+Calls RAGService directly — no HTTP, no Celery.
 
-            llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-            embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-            samples = [
-                SingleTurnSample(
-                    user_input=r["question"],
-                    response=r["generated_answer"],
-                    reference=r["ground_truth"],
-                    retrieved_contexts=r["contexts"],
-                )
-                for r in results
-                if r["generated_answer"] and r["contexts"]
-            ]
-
-            if not samples:
-                logger.warning("ragas_no_valid_samples")
-                return {"faithfulness": 0.0, "answer_relevancy": 0.0, "context_recall": 0.0}
-
-            dataset = EvaluationDataset(samples=samples)
-            metrics = [
-                Faithfulness(llm=llm),
-                AnswerRelevancy(llm=llm, embeddings=embeddings),
-                ContextRecall(llm=llm),
-            ]
-
-            ragas_result = evaluate(dataset=dataset, metrics=metrics)
-
-            return {
-                "faithfulness": round(ragas_result["faithfulness"], 4),
-                "answer_relevancy": round(ragas_result["answer_relevancy"], 4),
-                "context_recall": round(ragas_result["context_recall"], 4),
-            }
-        except Exception as e:
-            logger.warning("ragas_metrics_failed", error=str(e))
-            return {
-                "faithfulness": 0.0,
-                "answer_relevancy": 0.0,
-                "context_recall": 0.0,
-            }
-```
-
-Also update the imports at the top of the file — remove unused `from datasets import Dataset` if present. The top-level imports stay the same (ragas is imported inside the method to avoid startup failures if not installed).
-
-**Step 4: Run tests**
-
-Run: `uv run pytest tests/unit/test_eval_service.py -v`
-Expected: 3 PASSED
-
-**Step 5: Commit**
-
-```bash
-git add backend/app/services/eval.py tests/unit/test_eval_service.py
-git commit -m "fix: update RAGAS to v0.4.3 class-based API (SingleTurnSample, EvaluationDataset)"
-```
-
----
-
-## Task 4: Scope EvalService to Seeded Documents
-
-**Files:**
-- Modify: `backend/app/services/eval.py`
-- Modify: `tests/unit/test_eval_service.py`
-
-**Step 1: Write the test**
-
-Add to `tests/unit/test_eval_service.py`:
-
-```python
-async def test_eval_loads_manifest():
-    """Verify eval loads seed manifest and extracts doc_ids."""
-    service = EvalService.__new__(EvalService)
-    manifest = {
-        "user_id": "test-user-123",
-        "documents": [
-            {"doc_name": "AAPL_10K.pdf", "doc_id": "doc-1", "hf_doc_name": "APPLE INC"},
-            {"doc_name": "MSFT_10K.pdf", "doc_id": "doc-2", "hf_doc_name": "MICROSOFT CORP"},
-        ],
-    }
-    with patch("builtins.open", mock_open(read_data=json.dumps(manifest))):
-        with patch("pathlib.Path.exists", return_value=True):
-            result = service._load_manifest()
-            assert result["user_id"] == "test-user-123"
-            assert len(result["doc_ids"]) == 2
-            assert "doc-1" in result["doc_ids"]
-```
-
-Add these imports at the top of the test file:
-
-```python
+Usage: uv run python eval/run_eval.py
+Requires: `make seed` to have been run first.
+"""
+import asyncio
 import json
-from unittest.mock import mock_open
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `uv run pytest tests/unit/test_eval_service.py::test_eval_loads_manifest -v`
-Expected: FAIL — `_load_manifest` not defined
-
-**Step 3: Add manifest loading and doc scoping to EvalService**
-
-In `backend/app/services/eval.py`, add after the imports:
-
-```python
+import time
 from pathlib import Path
 
 MANIFEST_PATH = Path("eval/datasets/seed_manifest.json")
-```
+RESULTS_PATH = Path("eval/results/financebench_results.json")
+SAMPLE_SIZE = 30
 
-Add `_load_manifest` method and update `run_eval` to use it:
 
-```python
-    def _load_manifest(self) -> dict:
-        """Load seed manifest to get doc_ids and user_id."""
-        if not MANIFEST_PATH.exists():
-            raise FileNotFoundError(
-                "Seed manifest not found. Run `make seed` first to ingest eval documents."
-            )
-        data = json.loads(MANIFEST_PATH.read_text())
-        return {
-            "user_id": data["user_id"],
-            "doc_ids": [d["doc_id"] for d in data["documents"]],
-            "documents": data["documents"],
-        }
-```
+def load_manifest() -> dict:
+    """Load seed manifest to get doc_ids."""
+    if not MANIFEST_PATH.exists():
+        raise FileNotFoundError(
+            "Seed manifest not found. Run `make seed` first."
+        )
+    data = json.loads(MANIFEST_PATH.read_text())
+    return {
+        "user_id": data["user_id"],
+        "doc_ids": [d["doc_id"] for d in data["documents"]],
+        "documents": data["documents"],
+    }
 
-Update the `run_eval` method — after `log.info("eval_start")`, add manifest loading. Update the `ChatRequest` construction in the results loop to include `doc_ids`:
 
-Replace the ChatRequest creation block (lines 45-49) with:
+async def load_questions(sample_size: int) -> list[dict]:
+    """Load FinanceBench questions matched to seeded companies."""
+    from datasets import load_dataset
 
-```python
-                request = ChatRequest(
-                    question=q["question"],
-                    llm="openai",
-                    doc_ids=manifest["doc_ids"],
-                    stream=False,
-                )
-```
+    # Load manifest to know which companies are seeded
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    hf_names = {d["hf_doc_name"].lower() for d in manifest["documents"]}
 
-The full updated `run_eval` method should start with:
+    ds = load_dataset("PatronusAI/financebench", split="train")
 
-```python
-    async def run_eval(
-        self,
-        dataset: str,
-        sample_size: int,
-        config: dict,
-    ) -> str:
-        """Run evaluation. Returns run_id. Called from Celery task."""
-        run_id = await self._create_run_record(dataset, sample_size, config)
-        log = logger.bind(run_id=run_id, dataset=dataset)
-        log.info("eval_start", sample_size=sample_size)
+    matched = []
+    for item in ds:
+        doc_name = item.get("doc_name", "").lower()
+        if any(name in doc_name for name in hf_names):
+            matched.append({
+                "question": item["question"],
+                "answer": item.get("answer", ""),
+                "doc_name": item.get("doc_name", ""),
+            })
+        if len(matched) >= sample_size:
+            break
+
+    if not matched:
+        print("WARNING: No matched questions found. Using first N from dataset.")
+        for item in ds.select(range(min(sample_size, len(ds)))):
+            matched.append({
+                "question": item["question"],
+                "answer": item.get("answer", ""),
+                "doc_name": item.get("doc_name", ""),
+            })
+
+    return matched
+
+
+async def run_eval(questions: list[dict], doc_ids: list[str]) -> dict:
+    """Run RAG pipeline on each question, collect results."""
+    from backend.app.services.rag import RAGService
+    from backend.app.schemas.chat import ChatRequest
+
+    service = RAGService()
+    results = []
+    latencies = []
+
+    for i, q in enumerate(questions):
+        start = time.time()
+        request = ChatRequest(
+            question=q["question"],
+            llm="openai",
+            doc_ids=doc_ids,
+            stream=False,
+        )
 
         try:
-            # Load manifest for doc scoping
-            manifest = self._load_manifest()
-            log.info("eval_manifest_loaded", doc_ids=len(manifest["doc_ids"]))
+            response = await service.query(request)
+            elapsed_ms = (time.time() - start) * 1000
+            latencies.append(elapsed_ms)
 
-            # Load dataset questions
-            questions = await self._load_dataset(dataset, sample_size)
-            log.info("eval_dataset_loaded", questions=len(questions))
+            results.append({
+                "question": q["question"],
+                "ground_truth": q.get("answer", ""),
+                "generated_answer": response.get("answer", ""),
+                "contexts": [
+                    s.get("content_preview", "")
+                    for s in response.get("sources", [])
+                ],
+                "relevant_found": any(
+                    s.get("score", 0) > 0.5
+                    for s in response.get("sources", [])
+                ),
+                "query_type": response.get("query_type", ""),
+                "hyde_used": response.get("hyde_used", False),
+            })
 
-            # Run RAG pipeline on each question
-            results = []
-            latencies = []
-            for i, q in enumerate(questions):
-                start = time.time()
-                request = ChatRequest(
-                    question=q["question"],
-                    llm="openai",
-                    doc_ids=manifest["doc_ids"],
-                    stream=False,
-                )
-                # ... rest stays the same
-```
+            status = "OK" if results[-1]["relevant_found"] else "MISS"
+            print(f"  [{i+1}/{len(questions)}] {status} ({elapsed_ms:.0f}ms) {q['question'][:60]}...")
+        except Exception as e:
+            print(f"  [{i+1}/{len(questions)}] ERROR: {e}")
+            results.append({
+                "question": q["question"],
+                "ground_truth": q.get("answer", ""),
+                "generated_answer": "",
+                "contexts": [],
+                "relevant_found": False,
+                "error": str(e),
+            })
 
-Also add `import json` to the top imports.
+    return {"results": results, "latencies": latencies}
 
-**Step 4: Run tests**
 
-Run: `uv run pytest tests/unit/test_eval_service.py -v`
-Expected: 4 PASSED
+def calculate_hit_rate(results: list[dict]) -> float:
+    """Percentage of questions where a relevant chunk was retrieved."""
+    if not results:
+        return 0.0
+    hits = sum(1 for r in results if r.get("relevant_found"))
+    return round(hits / len(results), 4)
 
-**Step 5: Commit**
 
-```bash
-git add backend/app/services/eval.py tests/unit/test_eval_service.py
-git commit -m "feat: scope eval to seeded docs via seed_manifest.json"
-```
+async def compute_ragas_metrics(results: list[dict]) -> dict:
+    """Compute RAGAS metrics using v0.4.3 class-based API."""
+    try:
+        from ragas import EvaluationDataset, SingleTurnSample, evaluate
+        from ragas.metrics import (
+            AnswerRelevancy,
+            ContextRecall,
+            Faithfulness,
+        )
+        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
----
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-## Task 5: Add List Eval Runs Endpoint
-
-**Files:**
-- Modify: `backend/app/api/eval.py`
-- Modify: `backend/app/services/eval.py`
-
-**Step 1: Add `list_runs` method to EvalService**
-
-Add to `backend/app/services/eval.py`:
-
-```python
-    async def list_runs(self) -> list[dict]:
-        """List all eval runs, most recent first."""
-        async with AsyncSessionLocal() as session:
-            from sqlalchemy import select
-
-            result = await session.execute(
-                select(EvalRun).order_by(EvalRun.created_at.desc())
+        samples = [
+            SingleTurnSample(
+                user_input=r["question"],
+                response=r["generated_answer"],
+                reference=r["ground_truth"],
+                retrieved_contexts=r["contexts"],
             )
-            runs = result.scalars().all()
-            return [
-                {
-                    "run_id": r.run_id,
-                    "status": r.status,
-                    "dataset": r.dataset,
-                    "sample_size": r.sample_size,
-                    "metrics": r.metrics,
-                    "created_at": r.created_at.isoformat() if r.created_at else None,
-                }
-                for r in runs
-            ]
+            for r in results
+            if r["generated_answer"] and r["contexts"]
+        ]
+
+        if not samples:
+            print("WARNING: No valid samples for RAGAS evaluation.")
+            return {"faithfulness": 0.0, "answer_relevancy": 0.0, "context_recall": 0.0}
+
+        print(f"\nComputing RAGAS metrics on {len(samples)} samples...")
+        dataset = EvaluationDataset(samples=samples)
+        metrics = [
+            Faithfulness(llm=llm),
+            AnswerRelevancy(llm=llm, embeddings=embeddings),
+            ContextRecall(llm=llm),
+        ]
+
+        ragas_result = evaluate(dataset=dataset, metrics=metrics)
+
+        return {
+            "faithfulness": round(ragas_result["faithfulness"], 4),
+            "answer_relevancy": round(ragas_result["answer_relevancy"], 4),
+            "context_recall": round(ragas_result["context_recall"], 4),
+        }
+    except Exception as e:
+        print(f"WARNING: RAGAS metrics failed: {e}")
+        return {"faithfulness": 0.0, "answer_relevancy": 0.0, "context_recall": 0.0}
+
+
+async def main():
+    print("=== DocMind RAG — Baseline Evaluation ===\n")
+
+    # 1. Load manifest
+    manifest = load_manifest()
+    print(f"Eval docs: {len(manifest['doc_ids'])} documents")
+
+    # 2. Load questions
+    questions = await load_questions(SAMPLE_SIZE)
+    print(f"Questions: {len(questions)} matched to seeded docs\n")
+
+    # 3. Run RAG on each question
+    print("Running RAG pipeline...")
+    eval_data = await run_eval(questions, manifest["doc_ids"])
+    results = eval_data["results"]
+    latencies = eval_data["latencies"]
+
+    # 4. Compute metrics
+    hit_rate = calculate_hit_rate(results)
+
+    ragas = await compute_ragas_metrics(results)
+
+    latencies.sort()
+    p95_idx = int(len(latencies) * 0.95)
+    latency_p95 = round(latencies[p95_idx] if latencies else 0, 1)
+
+    metrics = {
+        "retrieval_hit_rate": hit_rate,
+        **ragas,
+        "latency_p95_ms": latency_p95,
+        "sample_size": len(results),
+    }
+
+    # 5. Display results
+    print(f"\n{'='*50}")
+    print(f"  DocMind RAG — Baseline Evaluation Results")
+    print(f"{'='*50}")
+    print(f"  Retrieval Hit Rate:  {metrics['retrieval_hit_rate']:.1%}")
+    print(f"  Faithfulness:        {metrics['faithfulness']:.4f}")
+    print(f"  Answer Relevancy:    {metrics['answer_relevancy']:.4f}")
+    print(f"  Context Recall:      {metrics['context_recall']:.4f}")
+    print(f"  Latency p95:         {metrics['latency_p95_ms']:.0f}ms")
+    print(f"  Sample Size:         {metrics['sample_size']}")
+    print(f"{'='*50}")
+
+    # 6. Save results
+    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    output = {
+        "dataset": "financebench",
+        "config": "default (parent-child 800/150, enrichment, tables atomic)",
+        "metrics": metrics,
+        "per_question": results,
+    }
+    RESULTS_PATH.write_text(json.dumps(output, indent=2))
+    print(f"\nResults saved to {RESULTS_PATH}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-**Step 2: Add the endpoint to `backend/app/api/eval.py`**
+**Step 2: Update Makefile**
 
-Add before the `get_eval_results` route:
+In `Makefile`, replace the `eval` target:
 
-```python
-@router.get("/results")
-async def list_eval_runs():
-    """List all evaluation runs."""
-    from backend.app.services.eval import EvalService
-
-    service = EvalService()
-    return await service.list_runs()
+```makefile
+eval:
+	uv run python eval/run_eval.py
 ```
 
-**Step 3: Verify import**
+**Step 3: Verify syntax**
 
-Run: `uv run python -c "from backend.app.api.eval import router; print('OK')"`
+Run: `uv run python -c "import ast; ast.parse(open('eval/run_eval.py').read()); print('OK')"`
 Expected: `OK`
 
 **Step 4: Commit**
 
 ```bash
-git add backend/app/api/eval.py backend/app/services/eval.py
-git commit -m "feat: add GET /eval/results to list all eval runs"
+git add eval/run_eval.py Makefile
+git commit -m "feat: eval runner script — calls RAGService directly, RAGAS v0.4.3, saves JSON"
 ```
 
 ---
 
-## Task 6: Update Baseline Eval Notebook
+## Task 4: Remove Eval API Endpoint + Celery Task
+
+**Files:**
+- Delete: `backend/app/api/eval.py`
+- Delete: `backend/app/workers/eval_tasks.py`
+- Modify: `backend/app/main.py` — remove eval router registration
+- Delete: `backend/app/services/eval.py` — no longer needed (logic moved to script)
+
+**Step 1: Remove eval router from main.py**
+
+In `backend/app/main.py`, remove:
+- The import: `from backend.app.api import ... eval ...`
+- The router: `app.include_router(eval.router, prefix="/api/v1/eval", tags=["eval"])`
+
+**Step 2: Delete files**
+
+```bash
+rm backend/app/api/eval.py
+rm backend/app/workers/eval_tasks.py
+rm backend/app/services/eval.py
+```
+
+Keep `backend/app/models/eval.py` and `backend/app/schemas/eval.py` — they're still useful for storing eval run history if we add that later.
+
+**Step 3: Verify backend still starts**
+
+Run: `uv run python -c "from backend.app.main import app; print('OK')"`
+Expected: `OK`
+
+**Step 4: Commit**
+
+```bash
+git add -u
+git commit -m "refactor: remove eval API + Celery task — replaced by direct script"
+```
+
+---
+
+## Task 5: Update Baseline Notebook (Viz Only)
 
 **Files:**
 - Rewrite: `eval/notebooks/01_baseline_eval.ipynb`
 
 **Step 1: Rewrite the notebook**
 
-Update `eval/notebooks/01_baseline_eval.ipynb` with these cells:
+The notebook now just loads and displays saved results — no HTTP calls, no polling.
 
 **Cell 0 (markdown):**
 ```markdown
-# DocMind RAG — Baseline Evaluation
+# DocMind RAG — Baseline Evaluation Results
 
-FinanceBench dataset (5 seeded 10-K filings, ~30 questions).
+FinanceBench dataset (5 seeded 10-K filings).
 Default config: Parent-Child (800/150), text-embedding-3-small, GPT-4o.
 
-**Prerequisites:** `make seed` must have been run first.
+**To run eval:** `make seed && make eval`
+This notebook displays the saved results.
 ```
 
 **Cell 1 (code):**
 ```python
 import json
 from pathlib import Path
-import httpx
 
-API_BASE = "http://localhost:8000/api/v1"
+results_path = Path("../results/financebench_results.json")
+if not results_path.exists():
+    raise FileNotFoundError(
+        "No results found. Run `make seed && make eval` first."
+    )
 
-# Verify seed manifest exists
-manifest_path = Path("../datasets/seed_manifest.json")
-if not manifest_path.exists():
-    raise FileNotFoundError("Run `make seed` first to ingest eval documents.")
+data = json.loads(results_path.read_text())
+metrics = data["metrics"]
 
-manifest = json.loads(manifest_path.read_text())
-print(f"Seeded docs: {len(manifest['documents'])}")
-for doc in manifest["documents"]:
-    print(f"  {doc['doc_name']} → {doc['doc_id']} ({doc.get('child_chunks', '?')} chunks)")
+print(f"Dataset:  {data['dataset']}")
+print(f"Config:   {data['config']}")
+print(f"Samples:  {metrics['sample_size']}")
 ```
 
 **Cell 2 (code):**
 ```python
-# Start eval run
-response = httpx.post(f"{API_BASE}/eval/run", json={
-    "dataset": "financebench",
-    "sample_size": 30,
-}, timeout=30)
-result = response.json()
-print(f"Eval started: {result}")
-run_id = result.get("run_id", "")
+# Metrics summary
+print(f"\n{'='*50}")
+print(f"  Evaluation Metrics")
+print(f"{'='*50}")
+print(f"  Retrieval Hit Rate:  {metrics['retrieval_hit_rate']:.1%}")
+print(f"  Faithfulness:        {metrics['faithfulness']:.4f}")
+print(f"  Answer Relevancy:    {metrics['answer_relevancy']:.4f}")
+print(f"  Context Recall:      {metrics['context_recall']:.4f}")
+print(f"  Latency p95:         {metrics['latency_p95_ms']:.0f}ms")
+print(f"{'='*50}")
 ```
 
 **Cell 3 (code):**
 ```python
-# Poll for results
-import time
-
-data = {}
-for attempt in range(60):
-    r = httpx.get(f"{API_BASE}/eval/results/{run_id}", timeout=30)
-    data = r.json()
-    status = data.get("status", "unknown")
-    if status in ("completed", "failed"):
-        break
-    print(f"[{attempt+1}/60] Status: {status}...")
-    time.sleep(15)
-
-print(f"\nFinal status: {data.get('status')}")
-if data.get("error"):
-    print(f"Error: {data['error']}")
+# Per-question breakdown
+questions = data.get("per_question", [])
+print(f"\n{'#':<4} {'Hit':<5} {'Type':<12} {'Question':<60}")
+print("-" * 81)
+for i, q in enumerate(questions, 1):
+    hit = "Y" if q.get("relevant_found") else "N"
+    qtype = q.get("query_type", "?")
+    question = q["question"][:58]
+    print(f"{i:<4} {hit:<5} {qtype:<12} {question}")
 ```
 
-**Cell 4 (code):**
-```python
-# Display results
-if data.get("status") == "completed":
-    metrics = data.get("metrics", {})
+**Step 2: Remove ablation notebook** (skipping ablation)
 
-    print(f"{'='*50}")
-    print(f"  DocMind RAG — Baseline Evaluation Results")
-    print(f"{'='*50}")
-    print(f"  Retrieval Hit Rate:  {metrics.get('retrieval_hit_rate', 0):.1%}")
-    print(f"  Faithfulness:        {metrics.get('faithfulness', 0):.4f}")
-    print(f"  Answer Relevancy:    {metrics.get('answer_relevancy', 0):.4f}")
-    print(f"  Context Recall:      {metrics.get('context_recall', 0):.4f}")
-    print(f"  Latency p95:         {metrics.get('latency_p95_ms', 0):.0f}ms")
-    print(f"  Sample Size:         {metrics.get('sample_size', 0)}")
-    print(f"{'='*50}")
-
-    # Save results
-    results_path = Path("../results/financebench_results.json")
-    results_path.parent.mkdir(parents=True, exist_ok=True)
-    results_path.write_text(json.dumps(data, indent=2))
-    print(f"\nResults saved to {results_path}")
-else:
-    print(f"Eval failed: {data}")
+```bash
+rm eval/notebooks/02_chunking_ablation.ipynb
 ```
 
-**Step 2: Commit**
+**Step 3: Commit**
 
 ```bash
 git add eval/notebooks/01_baseline_eval.ipynb
-git commit -m "feat: update baseline eval notebook — manifest check, 30 samples, save results"
+git rm eval/notebooks/02_chunking_ablation.ipynb
+git commit -m "feat: notebook shows saved results only, remove ablation notebook"
 ```
 
 ---
 
-## Task 7: Update Ablation Notebook
+## Task 6: Update Eval README + Download Script
 
 **Files:**
-- Rewrite: `eval/notebooks/02_chunking_ablation.ipynb`
-
-**Step 1: Rewrite the notebook**
-
-Update `eval/notebooks/02_chunking_ablation.ipynb` with these cells:
-
-**Cell 0 (markdown):**
-```markdown
-# DocMind RAG — Chunking Ablation Study
-
-Compares 4 configurations:
-- **A**: Fixed-size (400 words, no parent-child, no enrichment)
-- **B**: Parent-child (800/150, no enrichment)
-- **C**: Parent-child + contextual enrichment
-- **D**: Parent-child + enrichment + tables atomic (default)
-
-Expected: D > C > B > A. Tables-atomic gap should be the largest single jump.
-
-**Note:** Each config requires re-ingestion. This notebook takes ~30 min total.
-```
-
-**Cell 1 (code):**
-```python
-import json
-import time
-from pathlib import Path
-import httpx
-
-API_BASE = "http://localhost:8000/api/v1"
-SAMPLE_SIZE = 30
-
-configs = {
-    "A_fixed_size": {
-        "parent_max_words": 400,
-        "child_max_words": 400,
-        "enrichment": False,
-        "tables_atomic": False,
-    },
-    "B_parent_child": {
-        "parent_max_words": 800,
-        "child_max_words": 150,
-        "enrichment": False,
-        "tables_atomic": False,
-    },
-    "C_enriched": {
-        "parent_max_words": 800,
-        "child_max_words": 150,
-        "enrichment": True,
-        "tables_atomic": False,
-    },
-    "D_full": {
-        "parent_max_words": 800,
-        "child_max_words": 150,
-        "enrichment": True,
-        "tables_atomic": True,
-    },
-}
-
-run_ids = {}
-for name, config in configs.items():
-    print(f"Starting config: {name}")
-    r = httpx.post(f"{API_BASE}/eval/run", json={
-        "dataset": "financebench",
-        "sample_size": SAMPLE_SIZE,
-        "config": config,
-    }, timeout=30)
-    data = r.json()
-    run_ids[name] = data.get("run_id", "")
-    print(f"  run_id: {run_ids[name]}")
-```
-
-**Cell 2 (code):**
-```python
-# Poll all runs until complete
-results = {}
-for name, run_id in run_ids.items():
-    print(f"Waiting for {name}...")
-    for attempt in range(120):
-        r = httpx.get(f"{API_BASE}/eval/results/{run_id}", timeout=30)
-        data = r.json()
-        if data.get("status") in ("completed", "failed"):
-            results[name] = data
-            status = data.get("status")
-            print(f"  {name}: {status}")
-            break
-        if attempt % 4 == 0:
-            print(f"  [{attempt}] {name}: {data.get('status', 'unknown')}...")
-        time.sleep(15)
-    else:
-        results[name] = {"status": "timeout"}
-        print(f"  {name}: TIMEOUT")
-```
-
-**Cell 3 (code):**
-```python
-# Comparison table
-print(f"\n{'Config':<20} {'Hit Rate':<12} {'Faithful':<12} {'Relevancy':<12} {'Recall':<12} {'p95 (ms)':<10}")
-print("=" * 78)
-
-for name in ["A_fixed_size", "B_parent_child", "C_enriched", "D_full"]:
-    data = results.get(name, {})
-    m = data.get("metrics", {})
-    if data.get("status") == "completed":
-        print(
-            f"{name:<20} "
-            f"{m.get('retrieval_hit_rate', 0):<12.1%} "
-            f"{m.get('faithfulness', 0):<12.4f} "
-            f"{m.get('answer_relevancy', 0):<12.4f} "
-            f"{m.get('context_recall', 0):<12.4f} "
-            f"{m.get('latency_p95_ms', 0):<10.0f}"
-        )
-    else:
-        print(f"{name:<20} {'FAILED':<12}")
-
-# Save results
-results_path = Path("../results/ablation_results.json")
-results_path.parent.mkdir(parents=True, exist_ok=True)
-results_path.write_text(json.dumps(results, indent=2))
-print(f"\nResults saved to {results_path}")
-```
-
-**Step 2: Commit**
-
-```bash
-git add eval/notebooks/02_chunking_ablation.ipynb
-git commit -m "feat: update ablation notebook — 4 configs, comparison table, save results"
-```
-
----
-
-## Task 8: Update Download Script + Eval README
-
-**Files:**
-- Modify: `eval/datasets/download_financebench.py`
 - Modify: `eval/README.md`
+- Modify: `eval/datasets/download_financebench.py`
 
-**Step 1: Update download script to also save matched questions**
+**Step 1: Update download script to save matched questions**
 
-In `eval/datasets/download_financebench.py`, add after the main questions dump (after line 36), a section to filter questions relevant to our 5 seeded companies:
+In `eval/datasets/download_financebench.py`, add after the main dump (after line 36):
 
 ```python
     # Also save questions matched to seed companies
@@ -847,9 +686,7 @@ In `eval/datasets/download_financebench.py`, add after the main questions dump (
     print(f"Saved {len(matched)} matched questions (for 5 seed companies) to {matched_path}")
 ```
 
-**Step 2: Update eval README**
-
-Rewrite `eval/README.md`:
+**Step 2: Rewrite eval README**
 
 ```markdown
 # Evaluation
@@ -860,26 +697,28 @@ Rewrite `eval/README.md`:
 # 1. Start services
 docker compose up -d
 
-# 2. Start backend + worker
-make backend   # terminal 1
-make worker    # terminal 2
-
-# 3. Seed FinanceBench documents (downloads 5 10-K PDFs, ingests them)
+# 2. Seed FinanceBench documents (downloads 5 10-K PDFs, ingests them)
 make seed
 
-# 4. Run baseline eval
-# Open eval/notebooks/01_baseline_eval.ipynb in Jupyter
+# 3. Run evaluation
+make eval
 
-# 5. Run ablation study (optional, ~30 min)
-# Open eval/notebooks/02_chunking_ablation.ipynb
+# 4. View results
+# Open eval/notebooks/01_baseline_eval.ipynb
+# Or: cat eval/results/financebench_results.json
 ```
 
-## Datasets
+## How It Works
 
-- **FinanceBench**: QA pairs from real SEC filings (10-K, 10-Q)
-- Source: `PatronusAI/financebench` on HuggingFace
-- Download full dataset: `uv run python eval/datasets/download_financebench.py`
-- Seed (5 filings): `make seed`
+```
+make seed   → Download 5 10-K PDFs → Ingest via full pipeline → Save manifest
+make eval   → Load questions → RAGService.query() per question → RAGAS metrics → Save JSON
+```
+
+The eval script calls `RAGService` directly (no HTTP/Celery). This tests the full pipeline:
+- **Ingestion quality** — did chunking/embedding produce good vectors?
+- **Retrieval quality** — does the agent find the right chunks?
+- **Generation quality** — is the answer faithful to the context?
 
 ## Metrics
 
@@ -893,64 +732,103 @@ make seed
 
 ## Reproduce
 
-1. `make seed` to ingest eval documents
-2. Run `eval/notebooks/01_baseline_eval.ipynb`
-3. Results saved to `eval/results/financebench_results.json`
-
-## Ablation
-
-`eval/notebooks/02_chunking_ablation.ipynb` compares 4 chunking configs:
-- A: Fixed-size 400 words
-- B: Parent-child 800/150
-- C: Parent-child + enrichment
-- D: Parent-child + enrichment + tables atomic (default)
-
-Results saved to `eval/results/ablation_results.json`
+1. `make seed` — ingest eval documents
+2. `make eval` — run evaluation
+3. Results: `eval/results/financebench_results.json`
+4. Notebook: `eval/notebooks/01_baseline_eval.ipynb`
 ```
 
 **Step 3: Commit**
 
 ```bash
 git add eval/datasets/download_financebench.py eval/README.md
-git commit -m "docs: update eval README + download script with matched questions"
+git commit -m "docs: update eval README for script-based flow, add matched questions to downloader"
 ```
 
 ---
 
-## Task 9: Final Integration Test
+## Task 7: Clean Up Tests + Final Verification
 
-**No new files — manual verification.**
+**Files:**
+- Modify: `tests/unit/test_eval_service.py`
 
-**Step 1: Verify all imports**
+**Step 1: Update tests**
 
-Run:
-```bash
-uv run python -c "
-from backend.app.services.eval import EvalService
-from backend.app.api.eval import router
-from scripts.seed_demo_data import FINANCEBENCH_DOCS
-print('All imports OK')
-"
+Since `EvalService` is removed, rewrite `tests/unit/test_eval_service.py` to test the eval script functions instead:
+
+```python
+import json
+import pytest
+from unittest.mock import patch, mock_open
+from pathlib import Path
+
+
+def test_calculate_hit_rate():
+    """Verify hit rate calculation."""
+    from eval.run_eval import calculate_hit_rate
+
+    results = [
+        {"relevant_found": True},
+        {"relevant_found": True},
+        {"relevant_found": False},
+        {"relevant_found": True},
+    ]
+    assert calculate_hit_rate(results) == 0.75
+
+
+def test_calculate_hit_rate_empty():
+    from eval.run_eval import calculate_hit_rate
+    assert calculate_hit_rate([]) == 0.0
+
+
+def test_load_manifest_missing():
+    """Verify clear error when manifest missing."""
+    from eval.run_eval import load_manifest
+
+    with patch.object(Path, "exists", return_value=False):
+        with pytest.raises(FileNotFoundError, match="make seed"):
+            load_manifest()
+
+
+def test_load_manifest_parses_doc_ids():
+    """Verify manifest parsing extracts doc_ids."""
+    from eval.run_eval import load_manifest
+
+    manifest = {
+        "user_id": "test-123",
+        "documents": [
+            {"doc_name": "AAPL.pdf", "doc_id": "d1", "hf_doc_name": "APPLE"},
+            {"doc_name": "MSFT.pdf", "doc_id": "d2", "hf_doc_name": "MICROSOFT"},
+        ],
+    }
+    with patch.object(Path, "exists", return_value=True):
+        with patch.object(Path, "read_text", return_value=json.dumps(manifest)):
+            result = load_manifest()
+            assert result["user_id"] == "test-123"
+            assert result["doc_ids"] == ["d1", "d2"]
 ```
-Expected: `All imports OK`
 
-**Step 2: Run all unit tests**
+**Step 2: Run tests**
 
 Run: `uv run pytest tests/unit/test_eval_service.py -v`
-Expected: All PASSED
+Expected: 4 PASSED
 
-**Step 3: Run full lint**
-
-Run: `uv run ruff check backend/app/services/eval.py backend/app/api/eval.py scripts/seed_demo_data.py`
-Expected: No errors
-
-**Step 4: Format**
-
-Run: `uv run ruff format backend/app/services/eval.py backend/app/api/eval.py scripts/seed_demo_data.py`
-
-**Step 5: Final commit if any formatting changes**
+**Step 3: Run full lint + format**
 
 ```bash
+uv run ruff check eval/run_eval.py scripts/seed_demo_data.py
+uv run ruff format eval/run_eval.py scripts/seed_demo_data.py
+```
+
+**Step 4: Run all unit tests to ensure nothing is broken**
+
+Run: `uv run pytest tests/unit -v`
+Expected: All PASSED
+
+**Step 5: Commit**
+
+```bash
+git add tests/unit/test_eval_service.py
 git add -u
-git commit -m "style: format eval files"
+git commit -m "test: update eval tests for script-based flow"
 ```
