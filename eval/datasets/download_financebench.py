@@ -37,6 +37,17 @@ def main():
 
     print(f"Saved {len(questions)} questions to {output_path}")
 
+    # Also save questions matched to seed companies
+    seed_companies = ["APPLE", "MICROSOFT", "AMAZON", "ALPHABET", "META PLATFORMS"]
+    matched = [
+        q for q in questions
+        if any(c in q.get("doc_name", "").upper() for c in seed_companies)
+    ]
+    matched_path = output_dir / "financebench_matched.json"
+    with open(matched_path, "w") as f:
+        json.dump(matched, f, indent=2)
+    print(f"Saved {len(matched)} matched questions (for 5 seed companies) to {matched_path}")
+
     # Print summary
     categories = {}
     for q in questions:
