@@ -5,6 +5,7 @@ Creates a system eval user, downloads 5 10-K PDFs, ingests them.
 Usage: uv run python scripts/seed_demo_data.py
 Requires: Docker services running (qdrant, postgres, redis)
 """
+
 import asyncio
 import json
 import secrets
@@ -41,6 +42,7 @@ async def get_or_create_eval_user() -> str:
             return user.id
 
     from backend.app.services.auth import AuthService
+
     auth = AuthService()
     user = await auth.register(
         email=EVAL_USER_EMAIL,
@@ -69,19 +71,26 @@ async def download_financebench_pdfs(tmp_dir: Path) -> list[dict]:
                         pdf_path = tmp_dir / target["doc_name"]
                         if not pdf_path.exists():
                             import httpx
+
                             print(f"  Downloading {target['doc_name']}...")
                             try:
-                                async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+                                async with httpx.AsyncClient(
+                                    timeout=120, follow_redirects=True
+                                ) as client:
                                     r = await client.get(doc_link)
                                     if r.status_code == 200 and len(r.content) > 1000:
                                         pdf_path.write_bytes(r.content)
-                                        docs.append({
-                                            "doc_name": target["doc_name"],
-                                            "hf_doc_name": doc_name,
-                                            "path": str(pdf_path),
-                                        })
+                                        docs.append(
+                                            {
+                                                "doc_name": target["doc_name"],
+                                                "hf_doc_name": doc_name,
+                                                "path": str(pdf_path),
+                                            }
+                                        )
                                     else:
-                                        print(f"    Skip: status={r.status_code}, size={len(r.content)}")
+                                        print(
+                                            f"    Skip: status={r.status_code}, size={len(r.content)}"
+                                        )
                             except Exception as e:
                                 print(f"    Download failed: {e}")
                         break
@@ -99,16 +108,18 @@ async def download_financebench_pdfs(tmp_dir: Path) -> list[dict]:
 
 def create_synthetic_docs(tmp_dir: Path) -> list[dict]:
     docs = []
-    for i, company in enumerate(["Acme Corp", "Beta Inc", "Gamma LLC", "Delta Co", "Echo Ltd"]):
-        path = tmp_dir / f"synthetic_{i+1}.txt"
+    for i, company in enumerate(
+        ["Acme Corp", "Beta Inc", "Gamma LLC", "Delta Co", "Echo Ltd"]
+    ):
+        path = tmp_dir / f"synthetic_{i + 1}.txt"
         path.write_text(
             f"{company} Annual Report 2023\n\n"
             f"Financial Overview\n"
-            f"Total revenue for fiscal year 2023 was ${(i+1)*10}B.\n"
-            f"Operating income was ${(i+1)*2}B.\n\n"
+            f"Total revenue for fiscal year 2023 was ${(i + 1) * 10}B.\n"
+            f"Operating income was ${(i + 1) * 2}B.\n\n"
             f"Business Segments\n"
-            f"{company} operates in {i+2} segments globally.\n"
-            f"The largest segment contributed {50+i*5}% of revenue.\n\n"
+            f"{company} operates in {i + 2} segments globally.\n"
+            f"The largest segment contributed {50 + i * 5}% of revenue.\n\n"
             f"Risk Factors\n"
             f"Key risks include market competition and regulatory changes.\n"
         )
@@ -118,6 +129,7 @@ def create_synthetic_docs(tmp_dir: Path) -> list[dict]:
 
 async def ingest_docs(docs: list[dict], user_id: str) -> list[dict]:
     from backend.app.services.ingestion import IngestionService
+
     service = IngestionService()
 
     manifest_docs = []
@@ -129,13 +141,15 @@ async def ingest_docs(docs: list[dict], user_id: str) -> list[dict]:
                 doc_name=doc["doc_name"],
                 user_id=user_id,
             )
-            manifest_docs.append({
-                "doc_name": doc["doc_name"],
-                "hf_doc_name": doc["hf_doc_name"],
-                "doc_id": result["doc_id"],
-                "elements_parsed": result["elements_parsed"],
-                "child_chunks": result["child_chunks"],
-            })
+            manifest_docs.append(
+                {
+                    "doc_name": doc["doc_name"],
+                    "hf_doc_name": doc["hf_doc_name"],
+                    "doc_id": result["doc_id"],
+                    "elements_parsed": result["elements_parsed"],
+                    "child_chunks": result["child_chunks"],
+                }
+            )
             print(
                 f"  Done: {result['elements_parsed']} elements, "
                 f"{result['child_chunks']} chunks indexed"

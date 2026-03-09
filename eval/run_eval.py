@@ -6,6 +6,7 @@ Calls RAGService directly — no HTTP, no Celery.
 Usage: uv run python eval/run_eval.py
 Requires: `make seed` to have been run first.
 """
+
 import asyncio
 import json
 import time
@@ -18,9 +19,7 @@ SAMPLE_SIZE = 30
 
 def load_manifest() -> dict:
     if not MANIFEST_PATH.exists():
-        raise FileNotFoundError(
-            "Seed manifest not found. Run `make seed` first."
-        )
+        raise FileNotFoundError("Seed manifest not found. Run `make seed` first.")
     data = json.loads(MANIFEST_PATH.read_text())
     return {
         "user_id": data["user_id"],
@@ -40,22 +39,26 @@ async def load_questions(manifest: dict, sample_size: int) -> list[dict]:
     for item in ds:
         doc_name = item.get("doc_name", "").lower()
         if any(name in doc_name for name in hf_names):
-            matched.append({
-                "question": item["question"],
-                "answer": item.get("answer", ""),
-                "doc_name": item.get("doc_name", ""),
-            })
+            matched.append(
+                {
+                    "question": item["question"],
+                    "answer": item.get("answer", ""),
+                    "doc_name": item.get("doc_name", ""),
+                }
+            )
         if len(matched) >= sample_size:
             break
 
     if not matched:
         print("WARNING: No matched questions found. Using first N from dataset.")
         for item in ds.select(range(min(sample_size, len(ds)))):
-            matched.append({
-                "question": item["question"],
-                "answer": item.get("answer", ""),
-                "doc_name": item.get("doc_name", ""),
-            })
+            matched.append(
+                {
+                    "question": item["question"],
+                    "answer": item.get("answer", ""),
+                    "doc_name": item.get("doc_name", ""),
+                }
+            )
 
     return matched
 
@@ -82,34 +85,39 @@ async def run_eval(questions: list[dict], doc_ids: list[str]) -> dict:
             elapsed_ms = (time.time() - start) * 1000
             latencies.append(elapsed_ms)
 
-            results.append({
-                "question": q["question"],
-                "ground_truth": q.get("answer", ""),
-                "generated_answer": response.get("answer", ""),
-                "contexts": [
-                    s.get("content_preview", "")
-                    for s in response.get("sources", [])
-                ],
-                "relevant_found": any(
-                    s.get("score", 0) > 0.5
-                    for s in response.get("sources", [])
-                ),
-                "query_type": response.get("query_type", ""),
-                "hyde_used": response.get("hyde_used", False),
-            })
+            results.append(
+                {
+                    "question": q["question"],
+                    "ground_truth": q.get("answer", ""),
+                    "generated_answer": response.get("answer", ""),
+                    "contexts": [
+                        s.get("content_preview", "")
+                        for s in response.get("sources", [])
+                    ],
+                    "relevant_found": any(
+                        s.get("score", 0) > 0.5 for s in response.get("sources", [])
+                    ),
+                    "query_type": response.get("query_type", ""),
+                    "hyde_used": response.get("hyde_used", False),
+                }
+            )
 
             status = "OK" if results[-1]["relevant_found"] else "MISS"
-            print(f"  [{i+1}/{len(questions)}] {status} ({elapsed_ms:.0f}ms) {q['question'][:60]}...")
+            print(
+                f"  [{i + 1}/{len(questions)}] {status} ({elapsed_ms:.0f}ms) {q['question'][:60]}..."
+            )
         except Exception as e:
-            print(f"  [{i+1}/{len(questions)}] ERROR: {e}")
-            results.append({
-                "question": q["question"],
-                "ground_truth": q.get("answer", ""),
-                "generated_answer": "",
-                "contexts": [],
-                "relevant_found": False,
-                "error": str(e),
-            })
+            print(f"  [{i + 1}/{len(questions)}] ERROR: {e}")
+            results.append(
+                {
+                    "question": q["question"],
+                    "ground_truth": q.get("answer", ""),
+                    "generated_answer": "",
+                    "contexts": [],
+                    "relevant_found": False,
+                    "error": str(e),
+                }
+            )
 
     return {"results": results, "latencies": latencies}
 
@@ -198,16 +206,16 @@ async def main():
         "sample_size": len(results),
     }
 
-    print(f"\n{'='*50}")
-    print(f"  DocMind RAG — Baseline Evaluation Results")
-    print(f"{'='*50}")
+    print(f"\n{'=' * 50}")
+    print("  DocMind RAG — Baseline Evaluation Results")
+    print(f"{'=' * 50}")
     print(f"  Retrieval Hit Rate:  {metrics['retrieval_hit_rate']:.1%}")
     print(f"  Faithfulness:        {metrics['faithfulness']:.4f}")
     print(f"  Answer Relevancy:    {metrics['answer_relevancy']:.4f}")
     print(f"  Context Recall:      {metrics['context_recall']:.4f}")
     print(f"  Latency p95:         {metrics['latency_p95_ms']:.0f}ms")
     print(f"  Sample Size:         {metrics['sample_size']}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     output = {
