@@ -8,7 +8,6 @@ Requires: Docker services running (qdrant, postgres, redis)
 import asyncio
 import json
 import secrets
-import sys
 import tempfile
 from pathlib import Path
 

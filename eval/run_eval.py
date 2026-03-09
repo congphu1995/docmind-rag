@@ -29,10 +29,9 @@ def load_manifest() -> dict:
     }
 
 
-async def load_questions(sample_size: int) -> list[dict]:
+async def load_questions(manifest: dict, sample_size: int) -> list[dict]:
     from datasets import load_dataset
 
-    manifest = json.loads(MANIFEST_PATH.read_text())
     hf_names = {d["hf_doc_name"].lower() for d in manifest["documents"]}
 
     ds = load_dataset("PatronusAI/financebench", split="train")
@@ -176,7 +175,7 @@ async def main():
     manifest = load_manifest()
     print(f"Eval docs: {len(manifest['doc_ids'])} documents")
 
-    questions = await load_questions(SAMPLE_SIZE)
+    questions = await load_questions(manifest, SAMPLE_SIZE)
     print(f"Questions: {len(questions)} matched to seeded docs\n")
 
     print("Running RAG pipeline...")
