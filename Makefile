@@ -46,7 +46,7 @@ lint-fix:
 
 # Eval
 eval:
-	uv run python eval/datasets/download_financebench.py
+	uv run python eval/run_eval.py
 
 # Seed
 seed:
