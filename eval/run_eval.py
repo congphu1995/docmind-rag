@@ -89,17 +89,20 @@ async def run_eval(questions: list[dict], doc_ids: list[str]) -> dict:
             elapsed_ms = (time.time() - start) * 1000
             latencies.append(elapsed_ms)
 
+            # Use all reranked chunks for RAGAS contexts (full content)
+            reranked = response.get("reranked_chunks", [])
+            contexts = [
+                c.get("content", "") for c in reranked if c.get("content")
+            ]
+
             results.append(
                 {
                     "question": q["question"],
                     "ground_truth": q.get("answer", ""),
                     "generated_answer": response.get("answer", ""),
-                    "contexts": [
-                        s.get("content_preview", "")
-                        for s in response.get("sources", [])
-                    ],
+                    "contexts": contexts,
                     "relevant_found": any(
-                        s.get("score", 0) > 0.5 for s in response.get("sources", [])
+                        c.get("score", 0) > 0.5 for c in reranked
                     ),
                     "query_type": response.get("query_type", ""),
                     "hyde_used": response.get("hyde_used", False),
@@ -146,7 +149,12 @@ async def compute_ragas_metrics(results: list[dict]) -> dict:
             from ragas.metrics import AnswerRelevancy, ContextRecall, Faithfulness
 
         api_key = os.environ.get("OPENAI_API_KEY", "")
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0,
+            api_key=api_key,
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
         embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=api_key)
 
         samples = [
@@ -174,10 +182,14 @@ async def compute_ragas_metrics(results: list[dict]) -> dict:
 
         ragas_result = evaluate(dataset=dataset, metrics=metrics)
 
+        import math
+
         def safe_round(val, digits=4):
             if isinstance(val, list):
-                val = sum(v for v in val if v is not None) / max(len(val), 1)
-            return round(float(val), digits) if val is not None else 0.0
+                valid = [v for v in val if v is not None and not math.isnan(v)]
+                val = sum(valid) / max(len(valid), 1) if valid else 0.0
+            f = float(val) if val is not None else 0.0
+            return round(f, digits) if not math.isnan(f) else 0.0
 
         return {
             "faithfulness": safe_round(ragas_result["faithfulness"]),

@@ -4,7 +4,7 @@ export interface ChatMeta {
     doc_name: string;
     page: number;
     section: string;
-    content_preview: string;
+    content: string;
     score: number;
   }>;
   llm_used: string;

@@ -68,6 +68,7 @@ class RAGService:
         return {
             "answer": result.get("answer", ""),
             "sources": result.get("citations", []),
+            "reranked_chunks": result.get("reranked_chunks", []),
             "llm_used": request.llm,
             "hyde_used": result.get("hyde_used", False),
             "query_type": result.get("query_type", ""),
@@ -167,7 +168,7 @@ class RAGService:
                 "doc_name": chunk.get("doc_name", ""),
                 "page": chunk.get("page", 0),
                 "section": chunk.get("section", ""),
-                "content_preview": chunk.get("content", "")[:200],
+                "content": chunk.get("content", ""),
                 "score": chunk.get("score", 0.0),
             })
 

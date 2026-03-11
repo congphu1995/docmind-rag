@@ -49,9 +49,9 @@ export default function SourceFootnote({ source }: Props) {
           </div>
 
           {/* Content preview */}
-          {source.content_preview && (
+          {source.content && (
             <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-3">
-              {source.content_preview}
+              {source.content}
             </p>
           )}
 

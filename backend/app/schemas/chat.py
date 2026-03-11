@@ -13,7 +13,7 @@ class ChatSource(BaseModel):
     doc_name: str
     page: int
     section: str
-    content_preview: str
+    content: str
     score: float
     chunk_id: str
 

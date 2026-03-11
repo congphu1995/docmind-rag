@@ -47,7 +47,7 @@ def _extract_citations(answer: str, chunks: list[dict]) -> list[dict]:
                 "doc_name": chunk.get("doc_name", ""),
                 "page": chunk.get("page", 0),
                 "section": chunk.get("section", ""),
-                "content_preview": chunk.get("content", "")[:200],
+                "content": chunk.get("content", ""),
                 "score": chunk.get("score", 0.0),
                 "chunk_id": chunk.get("chunk_id", ""),
             })
