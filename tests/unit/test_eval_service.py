@@ -48,3 +48,37 @@ def test_load_manifest_parses_doc_ids():
             result = load_manifest()
             assert result["user_id"] == "test-123"
             assert result["doc_ids"] == ["d1", "d2"]
+
+
+def test_load_custom_dataset():
+    """Verify custom dataset JSON parsing."""
+    from scripts.seed_custom_eval import load_custom_dataset
+
+    dataset = {
+        "dataset": "docmind-custom",
+        "version": "1.0",
+        "papers": [
+            {
+                "paper_id": "attention-is-all-you-need",
+                "title": "Attention Is All You Need",
+                "pdf_url": "https://arxiv.org/pdf/1706.03762",
+                "filename": "attention_is_all_you_need.pdf",
+            }
+        ],
+        "questions": [],
+    }
+    with patch.object(Path, "exists", return_value=True):
+        with patch.object(Path, "read_text", return_value=json.dumps(dataset)):
+            result = load_custom_dataset()
+            assert result["version"] == "1.0"
+            assert len(result["papers"]) == 1
+            assert result["papers"][0]["paper_id"] == "attention-is-all-you-need"
+
+
+def test_load_custom_dataset_missing():
+    """Verify clear error when dataset file missing."""
+    from scripts.seed_custom_eval import load_custom_dataset
+
+    with patch.object(Path, "exists", return_value=False):
+        with pytest.raises(FileNotFoundError, match="custom_dataset.json"):
+            load_custom_dataset()
