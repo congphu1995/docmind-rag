@@ -124,8 +124,10 @@ New script: `scripts/seed_custom_eval.py`
 - Reads paper list from `eval/datasets/custom_dataset.json`
 - Downloads PDFs from each paper's `pdf_url` (direct arXiv PDF links) via `httpx.AsyncClient`
 - Fails fast if any download fails (same as `seed_demo_data.py`)
+- Creates or reuses an eval user (same as `seed_demo_data.py`)
 - Ingests each via `IngestionService` (same pattern as `seed_demo_data.py`)
-- Writes manifest to `eval/datasets/custom_manifest.json` with `paper_id` → `doc_id` mappings
+- Uses each paper's `filename` field as the downloaded file name
+- Writes manifest to `eval/datasets/custom_manifest.json` with `user_id` and `paper_id` → `doc_id` mappings (same shape as existing `seed_manifest.json`)
 
 Triggered via `make seed-custom`.
 
@@ -145,7 +147,8 @@ uv run python eval/run_eval.py --dataset custom
 - Build a `paper_id → doc_id` lookup from `custom_manifest.json`
 - Per-paper scoping: for each question, resolve `question.paper_id` → `doc_id` via the lookup, then pass `doc_ids=[doc_id]` to `ChatRequest`. This scopes retrieval to only the relevant paper (unlike FinanceBench which passes all doc_ids).
 - Same pipeline otherwise: RAGService.query() → RAGAS metrics → results JSON
-- arXiv download failures in the seed script are fatal — fail fast with a clear error (same behavior as existing `seed_demo_data.py`)
+- Results include both aggregate `metrics` and a `per_question` array (same as FinanceBench results), with each entry containing question, ground_truth, generated_answer, contexts, relevant_found, query_type
+- If manifest is missing, raise `FileNotFoundError` with guidance to run `make seed-custom` first
 
 ### Metrics Output
 
