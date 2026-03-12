@@ -1,4 +1,4 @@
-.PHONY: dev test lint eval seed frontend backend infra clean
+.PHONY: dev test lint eval eval-custom seed seed-custom frontend backend infra clean
 
 # Infrastructure
 infra:
@@ -48,9 +48,15 @@ lint-fix:
 eval:
 	uv run python eval/run_eval.py
 
+eval-custom:
+	uv run python eval/run_eval.py --dataset custom
+
 # Seed
 seed:
 	uv run python scripts/seed_demo_data.py
+
+seed-custom:
+	uv run python scripts/seed_custom_eval.py
 
 # Clean
 clean:
