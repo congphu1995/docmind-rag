@@ -1,6 +1,6 @@
 {
   "dataset": "docmind-custom",
-  "version": "1.0",
+  "version": "1.1",
   "papers": [
     {
       "paper_id": "attention-is-all-you-need",
@@ -75,10 +75,50 @@
       "difficulty": "easy"
     },
     {
+      "id": "att-f2",
+      "paper_id": "attention-is-all-you-need",
+      "question": "What is the dimensionality of the model (d_model) in the base Transformer?",
+      "answer": "512",
+      "type": "factual",
+      "source_section": "Section 3.2 / Table 3",
+      "source_page": [9],
+      "difficulty": "easy"
+    },
+    {
+      "id": "att-f3",
+      "paper_id": "attention-is-all-you-need",
+      "question": "How many attention heads does the base Transformer model use?",
+      "answer": "8",
+      "type": "factual",
+      "source_section": "Table 3",
+      "source_page": [9],
+      "difficulty": "easy"
+    },
+    {
+      "id": "att-f4",
+      "paper_id": "attention-is-all-you-need",
+      "question": "What was the BLEU score of the Transformer (big) on the EN-FR WMT 2014 translation task?",
+      "answer": "41.0",
+      "type": "factual",
+      "source_section": "Table 2",
+      "source_page": [8],
+      "difficulty": "easy"
+    },
+    {
       "id": "att-t1",
       "paper_id": "attention-is-all-you-need",
       "question": "How many parameters does the Transformer (big) model have compared to the base model?",
       "answer": "The big model has 213M parameters compared to 65M for the base model",
+      "type": "table_reasoning",
+      "source_section": "Table 3",
+      "source_page": [9],
+      "difficulty": "medium"
+    },
+    {
+      "id": "att-t2",
+      "paper_id": "attention-is-all-you-need",
+      "question": "In the ablation study, what happened to model quality when the number of attention heads was changed from 8 to 1 while keeping total computation constant?",
+      "answer": "Reducing from 8 heads to a single head decreased model quality by 0.9 BLEU, showing that multi-head attention is beneficial",
       "type": "table_reasoning",
       "source_section": "Table 3",
       "source_page": [9],
@@ -92,6 +132,756 @@
       "type": "multi_hop",
       "source_section": "Table 1 + Section 4",
       "source_page": [5, 6],
+      "difficulty": "hard"
+    },
+    {
+      "id": "att-m2",
+      "paper_id": "attention-is-all-you-need",
+      "question": "How does the Transformer's training cost compare to previous state-of-the-art models while achieving better translation quality?",
+      "answer": "The base Transformer surpassed all previous models and ensembles at a fraction of the training cost. The Transformer (big) required only 3.3 x 10^18 FLOPs while achieving 28.4 BLEU on EN-DE, outperforming models that required significantly more FLOPs.",
+      "type": "multi_hop",
+      "source_section": "Table 2 + Table 3",
+      "source_page": [8, 9],
+      "difficulty": "hard"
+    },
+    {
+      "id": "bert-f1",
+      "paper_id": "bert",
+      "question": "How many transformer layers does BERT-Large have?",
+      "answer": "24 layers (L=24)",
+      "type": "factual",
+      "source_section": "Section 3 / Table 1",
+      "source_page": [3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bert-f2",
+      "paper_id": "bert",
+      "question": "What percentage of input tokens are randomly masked during BERT pre-training?",
+      "answer": "15%",
+      "type": "factual",
+      "source_section": "Section 3.1",
+      "source_page": [4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bert-f3",
+      "paper_id": "bert",
+      "question": "What two pre-training tasks does BERT use?",
+      "answer": "Masked Language Model (MLM) and Next Sentence Prediction (NSP)",
+      "type": "factual",
+      "source_section": "Section 3.1 / Section 3.2",
+      "source_page": [4, 5],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bert-f4",
+      "paper_id": "bert",
+      "question": "What is the hidden size of BERT-Base?",
+      "answer": "768 (H=768)",
+      "type": "factual",
+      "source_section": "Section 3",
+      "source_page": [3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bert-t1",
+      "paper_id": "bert",
+      "question": "How many parameters does BERT-Large have compared to BERT-Base?",
+      "answer": "BERT-Large has 340M parameters compared to 110M for BERT-Base",
+      "type": "table_reasoning",
+      "source_section": "Section 3",
+      "source_page": [3],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bert-t2",
+      "paper_id": "bert",
+      "question": "What effect did removing the Next Sentence Prediction (NSP) task have on downstream performance in the ablation study?",
+      "answer": "Removing NSP significantly hurt performance on QNLI, MNLI, and SQuAD, demonstrating that NSP pre-training is important for tasks that require understanding sentence-pair relationships",
+      "type": "table_reasoning",
+      "source_section": "Table 5 / Section 5.1",
+      "source_page": [7],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bert-t3",
+      "paper_id": "bert",
+      "question": "How did increasing model size from BERT-Base to BERT-Large affect accuracy on MRPC in the ablation experiments?",
+      "answer": "Scaling from BERT-Base to BERT-Large improved accuracy on MRPC, demonstrating that increasing model size leads to improvements even on small-scale downstream tasks with only 3,600 training examples",
+      "type": "table_reasoning",
+      "source_section": "Table 6 / Section 5.2",
+      "source_page": [7, 8],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bert-m1",
+      "paper_id": "bert",
+      "question": "Why does BERT use a masked language model instead of a standard left-to-right language model for pre-training?",
+      "answer": "A standard left-to-right model can only condition on previous tokens, preventing it from incorporating future context. The masked LM randomly masks tokens and predicts them using both left and right context, enabling deep bidirectional pre-training which is critical for token-level and sentence-level tasks.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 3.1",
+      "source_page": [1, 4],
+      "difficulty": "hard"
+    },
+    {
+      "id": "bert-m2",
+      "paper_id": "bert",
+      "question": "How does BERT's fine-tuning approach compare to ELMo's feature-based approach in terms of performance?",
+      "answer": "BERT fine-tunes all parameters end-to-end with a task-specific output layer, while ELMo uses fixed pre-trained representations as features. The ablation study showed that fine-tuning BERT outperformed the feature-based approach, though using concatenation of the last four hidden layers as features came close on named entity recognition.",
+      "type": "multi_hop",
+      "source_section": "Section 5.3 + Table 7",
+      "source_page": [8, 9],
+      "difficulty": "hard"
+    },
+    {
+      "id": "resnet-f1",
+      "paper_id": "resnet",
+      "question": "How many layers does the deepest ResNet model evaluated on ImageNet have?",
+      "answer": "152 layers",
+      "type": "factual",
+      "source_section": "Section 4.2",
+      "source_page": [6],
+      "difficulty": "easy"
+    },
+    {
+      "id": "resnet-f2",
+      "paper_id": "resnet",
+      "question": "What top-5 error rate did the ResNet ensemble achieve on the ImageNet test set to win ILSVRC 2015?",
+      "answer": "3.57%",
+      "type": "factual",
+      "source_section": "Section 4.2",
+      "source_page": [6],
+      "difficulty": "easy"
+    },
+    {
+      "id": "resnet-f3",
+      "paper_id": "resnet",
+      "question": "What is the mathematical formulation of a residual building block?",
+      "answer": "y = F(x, {Wi}) + x, where x is the input, F is the residual mapping to be learned, and the output is the sum of the residual function and the identity shortcut connection",
+      "type": "factual",
+      "source_section": "Section 3.1 / Equation 1",
+      "source_page": [2, 3],
+      "difficulty": "medium"
+    },
+    {
+      "id": "resnet-f4",
+      "paper_id": "resnet",
+      "question": "What problem does the residual learning framework aim to address?",
+      "answer": "The degradation problem, where adding more layers to a deep network leads to higher training error (not caused by overfitting), making deeper plain networks harder to optimize",
+      "type": "factual",
+      "source_section": "Section 1 / Section 3",
+      "source_page": [1, 2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "resnet-t1",
+      "paper_id": "resnet",
+      "question": "How did the 34-layer plain network's training error compare to the 18-layer plain network?",
+      "answer": "The 34-layer plain network exhibited higher training error than the 18-layer plain network throughout training, demonstrating the degradation problem where simply adding more layers to plain networks worsens performance",
+      "type": "table_reasoning",
+      "source_section": "Figure 4 / Table 2",
+      "source_page": [4, 5],
+      "difficulty": "medium"
+    },
+    {
+      "id": "resnet-t2",
+      "paper_id": "resnet",
+      "question": "How did the 34-layer ResNet compare to the 34-layer plain network in top-1 error on ImageNet validation?",
+      "answer": "The 34-layer ResNet achieved significantly lower top-1 error than the 34-layer plain network, reducing it by roughly 3.5 percentage points, showing that residual connections successfully address the degradation problem",
+      "type": "table_reasoning",
+      "source_section": "Table 2 / Figure 4",
+      "source_page": [4, 5],
+      "difficulty": "medium"
+    },
+    {
+      "id": "resnet-m1",
+      "paper_id": "resnet",
+      "question": "Why do shortcut connections solve the degradation problem that plain deep networks face?",
+      "answer": "Plain networks struggle to learn identity mappings through nonlinear layers when added depth is unnecessary. Shortcut connections let the network learn residual functions F(x) = H(x) - x. If identity is optimal, pushing F(x) to zero is easier than fitting H(x) = x through stacked nonlinear layers, so additional layers never hurt performance.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 3.1",
+      "source_page": [1, 2, 3],
+      "difficulty": "hard"
+    },
+    {
+      "id": "resnet-m2",
+      "paper_id": "resnet",
+      "question": "How does the bottleneck architecture in deeper ResNets differ from the basic residual block, and why is it used?",
+      "answer": "The basic block uses two 3x3 conv layers, while the bottleneck uses 1x1, 3x3, 1x1 convolutions. The 1x1 layers reduce then restore dimensions, making the 3x3 layer operate on a lower-dimensional input. This design has similar computational cost to the basic block but enables much deeper networks (50/101/152 layers).",
+      "type": "multi_hop",
+      "source_section": "Section 3.3 + Section 4",
+      "source_page": [3, 5, 6],
+      "difficulty": "hard"
+    },
+    {
+      "id": "gpt2-f1",
+      "paper_id": "gpt2",
+      "question": "How many parameters does the largest GPT-2 model have?",
+      "answer": "1.5 billion parameters (1542M)",
+      "type": "factual",
+      "source_section": "Table 2 / Section 2.3",
+      "source_page": [4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "gpt2-f2",
+      "paper_id": "gpt2",
+      "question": "What dataset was GPT-2 trained on and how was it constructed?",
+      "answer": "WebText, a dataset created by scraping all outbound links from Reddit posts that received at least 3 karma, resulting in about 40GB of text from over 8 million documents",
+      "type": "factual",
+      "source_section": "Section 2.1",
+      "source_page": [3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "gpt2-f3",
+      "paper_id": "gpt2",
+      "question": "What tokenization method does GPT-2 use?",
+      "answer": "Byte-level Byte Pair Encoding (BPE) that operates on byte sequences rather than Unicode code points, with a vocabulary size of 50,257 tokens",
+      "type": "factual",
+      "source_section": "Section 2.2",
+      "source_page": [3, 4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "gpt2-f4",
+      "paper_id": "gpt2",
+      "question": "What is the context window size of GPT-2?",
+      "answer": "1024 tokens",
+      "type": "factual",
+      "source_section": "Table 2",
+      "source_page": [4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "gpt2-t1",
+      "paper_id": "gpt2",
+      "question": "How does GPT-2's performance scale with model size across language modeling benchmarks?",
+      "answer": "Performance improves log-linearly with model size: the 1542M parameter model achieves significantly lower perplexity than the 117M model across all benchmarks, with each size increase yielding consistent improvements",
+      "type": "table_reasoning",
+      "source_section": "Table 3 / Section 3",
+      "source_page": [5, 6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gpt2-t2",
+      "paper_id": "gpt2",
+      "question": "How did GPT-2's zero-shot reading comprehension performance on CoQA compare to supervised baselines?",
+      "answer": "GPT-2 achieved 55 F1 on CoQA in a zero-shot conversational setting, matching or exceeding the performance of several supervised baseline systems trained on the dataset",
+      "type": "table_reasoning",
+      "source_section": "Section 3.6 / Table 5",
+      "source_page": [7],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gpt2-t3",
+      "paper_id": "gpt2",
+      "question": "Did GPT-2 achieve state-of-the-art results on any language modeling benchmark in a zero-shot setting?",
+      "answer": "Yes, GPT-2 achieved state-of-the-art results on 7 out of 8 language modeling benchmarks in a zero-shot setting, without any task-specific fine-tuning",
+      "type": "table_reasoning",
+      "source_section": "Table 3 / Section 3.1",
+      "source_page": [5, 6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gpt2-m1",
+      "paper_id": "gpt2",
+      "question": "Why did the authors choose byte-level BPE instead of word-level or character-level tokenization?",
+      "answer": "Word-level tokenization requires large vocabularies and cannot handle out-of-vocabulary words. Character-level models struggle with long-range dependencies. Byte-level BPE can encode any string while keeping a manageable vocabulary, avoiding preprocessing, tokenization errors, and OOV issues while still capturing subword patterns.",
+      "type": "multi_hop",
+      "source_section": "Section 2.2",
+      "source_page": [3, 4],
+      "difficulty": "hard"
+    },
+    {
+      "id": "gpt2-m2",
+      "paper_id": "gpt2",
+      "question": "What evidence do the authors present that GPT-2 is genuinely learning tasks rather than memorizing test data from its training set?",
+      "answer": "The authors conducted overlap analysis between WebText and evaluation datasets, finding that while some overlap exists, performance continues to improve with model size in a smooth log-linear trend. This suggests learning generalizable patterns rather than memorization, as memorization would produce sharp jumps rather than smooth scaling.",
+      "type": "multi_hop",
+      "source_section": "Section 4 + Section 3",
+      "source_page": [8, 5],
+      "difficulty": "hard"
+    },
+    {
+      "id": "adam-f1",
+      "paper_id": "adam",
+      "question": "What does the name 'Adam' stand for?",
+      "answer": "Adaptive Moment Estimation",
+      "type": "factual",
+      "source_section": "Abstract / Section 2",
+      "source_page": [1],
+      "difficulty": "easy"
+    },
+    {
+      "id": "adam-f2",
+      "paper_id": "adam",
+      "question": "What are the default values for the hyperparameters beta1 and beta2 in Adam?",
+      "answer": "beta1 = 0.9 and beta2 = 0.999",
+      "type": "factual",
+      "source_section": "Section 2 / Algorithm 1",
+      "source_page": [2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "adam-f3",
+      "paper_id": "adam",
+      "question": "What is the default learning rate (stepsize alpha) recommended for Adam?",
+      "answer": "alpha = 0.001",
+      "type": "factual",
+      "source_section": "Section 2 / Algorithm 1",
+      "source_page": [2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "adam-f4",
+      "paper_id": "adam",
+      "question": "What two moment estimates does Adam maintain during optimization?",
+      "answer": "The first moment estimate (mean of gradients, m_t) and the second moment estimate (mean of squared gradients / uncentered variance, v_t)",
+      "type": "factual",
+      "source_section": "Section 2",
+      "source_page": [2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "adam-t1",
+      "paper_id": "adam",
+      "question": "How did Adam compare to SGD with momentum, Adagrad, and RMSProp in the logistic regression experiments?",
+      "answer": "Adam converged faster than SGD with momentum, Adagrad, and RMSProp on the logistic regression experiments, achieving lower cost more quickly across the evaluated datasets",
+      "type": "table_reasoning",
+      "source_section": "Figure 1 / Section 6.1",
+      "source_page": [5, 6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "adam-t2",
+      "paper_id": "adam",
+      "question": "How did Adam's performance compare to other optimizers on neural network training with the MNIST dataset?",
+      "answer": "Adam achieved comparable or better training cost and convergence speed compared to SGD with Nesterov momentum, Adagrad, and RMSProp across different neural network architectures on MNIST",
+      "type": "table_reasoning",
+      "source_section": "Figure 2 / Section 6.2",
+      "source_page": [6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "adam-m1",
+      "paper_id": "adam",
+      "question": "Why does Adam include bias correction for the moment estimates, and what would happen without it?",
+      "answer": "The moment estimates m_t and v_t are initialized as zero vectors and biased toward zero, especially during initial timesteps and when decay rates beta1, beta2 are close to 1. Without bias correction, the effective step sizes would be too small early in training. The bias-corrected estimates m_hat_t and v_hat_t counteract this initialization bias.",
+      "type": "multi_hop",
+      "source_section": "Section 2 + Section 3",
+      "source_page": [2, 3],
+      "difficulty": "hard"
+    },
+    {
+      "id": "adam-m2",
+      "paper_id": "adam",
+      "question": "How does Adam combine ideas from both AdaGrad and RMSProp?",
+      "answer": "From AdaGrad, Adam inherits per-parameter adaptive learning rates that work well with sparse gradients. From RMSProp, it uses exponentially decaying averages of past squared gradients instead of accumulating all past squared gradients (which causes AdaGrad's learning rate to shrink monotonically). Adam adds bias correction on top of both mechanisms.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 5",
+      "source_page": [1, 4, 5],
+      "difficulty": "hard"
+    },
+    {
+      "id": "bn-f1",
+      "paper_id": "batch-norm",
+      "question": "What is Internal Covariate Shift as defined in the paper?",
+      "answer": "The change in the distribution of network activations due to the change in network parameters during training",
+      "type": "factual",
+      "source_section": "Section 1 / Abstract",
+      "source_page": [1],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bn-f2",
+      "paper_id": "batch-norm",
+      "question": "Where is batch normalization applied relative to the nonlinear activation function?",
+      "answer": "Batch normalization is applied before the nonlinear activation function, normalizing the input to the activation",
+      "type": "factual",
+      "source_section": "Section 3.1 / Section 3.2",
+      "source_page": [3, 4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bn-f3",
+      "paper_id": "batch-norm",
+      "question": "What two learnable parameters does batch normalization introduce per feature?",
+      "answer": "Scale parameter gamma and shift parameter beta, which allow the network to represent the identity transform and undo the normalization if that is optimal",
+      "type": "factual",
+      "source_section": "Section 3",
+      "source_page": [3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "bn-f4",
+      "paper_id": "batch-norm",
+      "question": "During inference, how does batch normalization compute the mean and variance?",
+      "answer": "Using population statistics (running/moving averages of mean and variance computed during training), rather than mini-batch statistics used during training",
+      "type": "factual",
+      "source_section": "Section 3.1 / Algorithm 2",
+      "source_page": [3, 4],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bn-t1",
+      "paper_id": "batch-norm",
+      "question": "How much faster did the batch-normalized Inception network reach the same accuracy as the original Inception?",
+      "answer": "The BN-Baseline model matched the classification accuracy of the original Inception network in less than half the number of training steps",
+      "type": "table_reasoning",
+      "source_section": "Section 4.2 / Figure 2",
+      "source_page": [6, 7],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bn-t2",
+      "paper_id": "batch-norm",
+      "question": "What happened when a 5x higher learning rate was used with batch normalization (BN-x5)?",
+      "answer": "BN-x5 trained with 5x the original Inception learning rate still converged and reached higher accuracy than the original non-BN Inception, demonstrating that batch normalization enables much higher learning rates without divergence",
+      "type": "table_reasoning",
+      "source_section": "Section 4.2 / Table 2",
+      "source_page": [6, 7],
+      "difficulty": "medium"
+    },
+    {
+      "id": "bn-m1",
+      "paper_id": "batch-norm",
+      "question": "Why does batch normalization allow the use of higher learning rates?",
+      "answer": "Without BN, higher learning rates amplify small parameter changes across layers, causing gradient explosion or getting stuck in poor local minima. BN stabilizes the distribution of layer inputs, preventing parameter changes from being amplified through the network depth, making the optimization landscape smoother and enabling higher learning rates.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 3.3",
+      "source_page": [1, 4],
+      "difficulty": "hard"
+    },
+    {
+      "id": "bn-m2",
+      "paper_id": "batch-norm",
+      "question": "How does batch normalization act as a regularizer, reducing the need for Dropout?",
+      "answer": "Each training example is processed with different mini-batch compositions, so the normalized activations include stochastic noise from the batch statistics. This noise has a regularizing effect similar to Dropout. The authors demonstrated that removing Dropout from BN-Inception did not increase overfitting, allowing them to simplify the model.",
+      "type": "multi_hop",
+      "source_section": "Section 3.4 + Section 4.2.1",
+      "source_page": [4, 7],
+      "difficulty": "hard"
+    },
+    {
+      "id": "yolo-f1",
+      "paper_id": "yolo",
+      "question": "What grid size does YOLO divide the input image into?",
+      "answer": "S x S grid where S = 7 (a 7x7 grid)",
+      "type": "factual",
+      "source_section": "Section 2",
+      "source_page": [2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "yolo-f2",
+      "paper_id": "yolo",
+      "question": "How many bounding boxes does each YOLO grid cell predict?",
+      "answer": "2 bounding boxes per grid cell (B = 2), each with 5 predictions: x, y, w, h, and confidence",
+      "type": "factual",
+      "source_section": "Section 2",
+      "source_page": [2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "yolo-f3",
+      "paper_id": "yolo",
+      "question": "What frame rate does YOLO achieve for real-time object detection?",
+      "answer": "45 frames per second for the base network, and 155 fps for the Fast YOLO variant",
+      "type": "factual",
+      "source_section": "Abstract / Section 2.3",
+      "source_page": [1, 3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "yolo-f4",
+      "paper_id": "yolo",
+      "question": "How many convolutional layers does the YOLO architecture have?",
+      "answer": "24 convolutional layers followed by 2 fully connected layers",
+      "type": "factual",
+      "source_section": "Section 2.1 / Figure 3",
+      "source_page": [3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "yolo-t1",
+      "paper_id": "yolo",
+      "question": "What is the most common type of error YOLO makes compared to Fast R-CNN?",
+      "answer": "YOLO makes significantly more localization errors than Fast R-CNN, but produces far fewer background false positives (false detections on background regions)",
+      "type": "table_reasoning",
+      "source_section": "Figure 4 / Section 4.2",
+      "source_page": [5, 6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "yolo-t2",
+      "paper_id": "yolo",
+      "question": "How does Fast YOLO's speed compare to the fastest variant of DPM on VOC 2007?",
+      "answer": "Fast YOLO runs at 155 fps, which is significantly faster than the fastest DPM variant (100Hz DPM at around 30 fps equivalent), while also achieving higher mAP",
+      "type": "table_reasoning",
+      "source_section": "Table 1 / Section 4.1",
+      "source_page": [5],
+      "difficulty": "medium"
+    },
+    {
+      "id": "yolo-m1",
+      "paper_id": "yolo",
+      "question": "Why does combining YOLO with Fast R-CNN improve overall detection accuracy?",
+      "answer": "YOLO and Fast R-CNN make complementary errors: YOLO rarely produces background false positives while Fast R-CNN has better localization. By using YOLO to evaluate and filter Fast R-CNN's detections, background false positives are eliminated, boosting the combined system's mAP above either model alone.",
+      "type": "multi_hop",
+      "source_section": "Section 4.2 + Table 2",
+      "source_page": [5, 6],
+      "difficulty": "hard"
+    },
+    {
+      "id": "yolo-m2",
+      "paper_id": "yolo",
+      "question": "Why does YOLO struggle with detecting small objects that appear in groups?",
+      "answer": "Each grid cell can only predict 2 bounding boxes and is assigned one class, creating strong spatial constraints. When multiple small objects (like flocks of birds) fall within the same grid cell, the model cannot predict more than 2 of them, leading to missed detections.",
+      "type": "multi_hop",
+      "source_section": "Section 2 + Section 4.3",
+      "source_page": [2, 6],
+      "difficulty": "hard"
+    },
+    {
+      "id": "gan-f1",
+      "paper_id": "gan",
+      "question": "What are the two neural networks that make up a Generative Adversarial Network?",
+      "answer": "A generative model G that captures the data distribution and produces synthetic samples, and a discriminative model D that estimates the probability that a sample came from the real training data rather than from G",
+      "type": "factual",
+      "source_section": "Section 1 / Section 3",
+      "source_page": [1, 2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "gan-f2",
+      "paper_id": "gan",
+      "question": "What is the optimal discriminator D*(x) at the equilibrium of the GAN minimax game?",
+      "answer": "D*_G(x) = p_data(x) / (p_data(x) + p_g(x)), which equals 1/2 for all x when the generator perfectly matches the data distribution (p_g = p_data)",
+      "type": "factual",
+      "source_section": "Proposition 1 / Section 4.1",
+      "source_page": [4],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gan-f3",
+      "paper_id": "gan",
+      "question": "What theoretical convergence result does the paper prove about GANs?",
+      "answer": "If G and D have enough capacity, and the discriminator is allowed to reach its optimum at each training step, then the generator's distribution p_g converges to the data distribution p_data",
+      "type": "factual",
+      "source_section": "Theorem 1 / Section 4.2",
+      "source_page": [4, 5],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gan-t1",
+      "paper_id": "gan",
+      "question": "How did GAN-generated samples compare to other generative models on the Parzen window log-likelihood metric?",
+      "answer": "On MNIST, the adversarial net achieved competitive log-likelihood compared to deep belief networks and other generative models. On TFD (Toronto Face Database), GANs achieved the best reported Parzen window log-likelihood among the compared methods.",
+      "type": "table_reasoning",
+      "source_section": "Table 1 / Section 5",
+      "source_page": [6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gan-t2",
+      "paper_id": "gan",
+      "question": "What generative models were compared against GANs in the experimental evaluation?",
+      "answer": "The paper compared GANs against Deep Belief Networks (DBN), Stacked Denoising Autoencoders (SdA), and Deep Generative Stochastic Networks (GSN) using Parzen window-based log-likelihood estimation",
+      "type": "table_reasoning",
+      "source_section": "Table 1 / Section 5",
+      "source_page": [6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "gan-m1",
+      "paper_id": "gan",
+      "question": "Why do the authors propose training G to maximize log D(G(z)) instead of minimizing log(1 - D(G(z)))?",
+      "answer": "Early in training when G is poor, D can confidently reject generated samples, causing log(1 - D(G(z))) to saturate and provide vanishingly small gradients for G. Maximizing log D(G(z)) provides much stronger gradients in this regime, enabling effective learning when the generator is still weak.",
+      "type": "multi_hop",
+      "source_section": "Section 3",
+      "source_page": [2, 3],
+      "difficulty": "hard"
+    },
+    {
+      "id": "gan-m2",
+      "paper_id": "gan",
+      "question": "How does the GAN framework avoid the need for Markov chains or approximate inference during training?",
+      "answer": "GANs only require backpropagation to train both G and D. The generator produces samples in a single forward pass from noise input, and the discriminator provides the training signal. This contrasts with models like Boltzmann machines that require MCMC sampling, or methods that need approximate posterior inference.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 6",
+      "source_page": [1, 7, 8],
+      "difficulty": "hard"
+    },
+    {
+      "id": "drop-f1",
+      "paper_id": "dropout",
+      "question": "What dropout rate is typically used for hidden units?",
+      "answer": "0.5 (retaining 50% of hidden units)",
+      "type": "factual",
+      "source_section": "Section 6 / Section 4",
+      "source_page": [7],
+      "difficulty": "easy"
+    },
+    {
+      "id": "drop-f2",
+      "paper_id": "dropout",
+      "question": "What dropout retention rate is recommended for input units?",
+      "answer": "A higher retention rate closer to 1, typically 0.8 (retaining 80% of input units), since dropping too many input features loses information",
+      "type": "factual",
+      "source_section": "Section 6 / Section 7.2",
+      "source_page": [7, 18],
+      "difficulty": "easy"
+    },
+    {
+      "id": "drop-f3",
+      "paper_id": "dropout",
+      "question": "At test time, how are the weights adjusted to account for dropout?",
+      "answer": "The weights are scaled by the retention probability p. If p=0.5, all outgoing weights of a unit are multiplied by 0.5 at test time, so the expected output matches training (weight scaling inference rule)",
+      "type": "factual",
+      "source_section": "Section 4",
+      "source_page": [5, 6],
+      "difficulty": "easy"
+    },
+    {
+      "id": "drop-f4",
+      "paper_id": "dropout",
+      "question": "What is the key motivation behind dropout?",
+      "answer": "To prevent co-adaptation of feature detectors by randomly dropping units during training, forcing each unit to learn useful features independently rather than relying on the presence of specific other units",
+      "type": "factual",
+      "source_section": "Section 1 / Abstract",
+      "source_page": [1, 2],
+      "difficulty": "easy"
+    },
+    {
+      "id": "drop-t1",
+      "paper_id": "dropout",
+      "question": "What effect did varying the dropout probability p have on test error?",
+      "answer": "For hidden layers, p=0.5 generally gave the best results. For input layers, higher retention rates (p=0.8-0.9) worked better. Performance degraded for both very low and very high dropout rates.",
+      "type": "table_reasoning",
+      "source_section": "Figure 7 / Section 7.2",
+      "source_page": [18],
+      "difficulty": "medium"
+    },
+    {
+      "id": "drop-t2",
+      "paper_id": "dropout",
+      "question": "On which vision benchmark did the authors demonstrate dropout's effectiveness with convolutional neural networks?",
+      "answer": "CIFAR-10, CIFAR-100, and the Street View House Numbers (SVHN) dataset, where adding dropout to convolutional networks significantly reduced test error compared to the same architectures without dropout",
+      "type": "table_reasoning",
+      "source_section": "Section 6.3 / Table 4",
+      "source_page": [12, 13],
+      "difficulty": "medium"
+    },
+    {
+      "id": "drop-t3",
+      "paper_id": "dropout",
+      "question": "How did dropout affect classification performance on the MNIST dataset compared to standard neural networks?",
+      "answer": "Dropout reduced test error on MNIST compared to standard neural networks without dropout, achieving state-of-the-art or near-state-of-the-art results across multiple network architectures",
+      "type": "table_reasoning",
+      "source_section": "Table 1 / Section 6.1",
+      "source_page": [9, 10],
+      "difficulty": "medium"
+    },
+    {
+      "id": "drop-m1",
+      "paper_id": "dropout",
+      "question": "How is dropout related to model ensembling?",
+      "answer": "Dropout can be viewed as training an exponentially large ensemble of sub-networks that share weights. Each dropout mask creates a different thinned network. At test time, the full network with scaled weights approximates the geometric mean of predictions from all 2^n possible sub-networks, providing efficient implicit ensembling.",
+      "type": "multi_hop",
+      "source_section": "Section 2 + Section 7",
+      "source_page": [3, 4, 17],
+      "difficulty": "hard"
+    },
+    {
+      "id": "drop-m2",
+      "paper_id": "dropout",
+      "question": "Why does combining dropout with max-norm regularization tend to improve performance?",
+      "answer": "Max-norm regularization constrains each hidden unit's weight vector to have a bounded norm, preventing weights from growing excessively large to compensate for dropped units. Combined with a large learning rate and high momentum, this enables more aggressive exploration of the weight space while keeping the network well-regularized.",
+      "type": "multi_hop",
+      "source_section": "Section 7.5 + Section 10",
+      "source_page": [19, 23],
+      "difficulty": "hard"
+    },
+    {
+      "id": "lora-f1",
+      "paper_id": "lora",
+      "question": "What is the key idea behind LoRA?",
+      "answer": "Freezing the pre-trained model weights and injecting trainable low-rank decomposition matrices into Transformer layers, representing the weight update as delta_W = BA where B is d x r and A is r x k, with rank r much smaller than d and k",
+      "type": "factual",
+      "source_section": "Section 1 / Section 3",
+      "source_page": [1, 3],
+      "difficulty": "easy"
+    },
+    {
+      "id": "lora-f2",
+      "paper_id": "lora",
+      "question": "How does LoRA affect inference latency?",
+      "answer": "LoRA adds zero additional inference latency because the low-rank matrices can be merged with the frozen weights (W + BA) to produce a single weight matrix, requiring no architectural changes at inference time",
+      "type": "factual",
+      "source_section": "Section 1 / Section 4.1",
+      "source_page": [1, 4],
+      "difficulty": "easy"
+    },
+    {
+      "id": "lora-f3",
+      "paper_id": "lora",
+      "question": "By how much can LoRA reduce the number of trainable parameters compared to full fine-tuning of GPT-3 175B?",
+      "answer": "LoRA can reduce the number of trainable parameters by up to 10,000x compared to full fine-tuning",
+      "type": "factual",
+      "source_section": "Abstract",
+      "source_page": [1],
+      "difficulty": "easy"
+    },
+    {
+      "id": "lora-f4",
+      "paper_id": "lora",
+      "question": "What rank r was found to be sufficient for many downstream tasks when adapting large language models?",
+      "answer": "A rank as low as 1 or 2 was sufficient for many tasks, suggesting that the weight updates have a very low intrinsic rank",
+      "type": "factual",
+      "source_section": "Section 7.1 / Table 6",
+      "source_page": [7, 8],
+      "difficulty": "medium"
+    },
+    {
+      "id": "lora-t1",
+      "paper_id": "lora",
+      "question": "How did LoRA's performance compare to full fine-tuning on downstream NLU benchmarks?",
+      "answer": "LoRA matched or exceeded full fine-tuning performance on most benchmarks while using only a small fraction of the trainable parameters, demonstrating that low-rank adaptation is sufficient for task-specific performance",
+      "type": "table_reasoning",
+      "source_section": "Table 2 / Table 4 / Section 5",
+      "source_page": [5, 6],
+      "difficulty": "medium"
+    },
+    {
+      "id": "lora-t2",
+      "paper_id": "lora",
+      "question": "What effect does increasing the rank r have on task performance in the ablation experiments?",
+      "answer": "Increasing rank r beyond a very small value (r=1-4) provides diminishing returns on most tasks, with performance plateauing quickly. This suggests that the adaptation needed for downstream tasks lives in a very low-dimensional subspace.",
+      "type": "table_reasoning",
+      "source_section": "Table 6 / Section 7.2",
+      "source_page": [7, 8],
+      "difficulty": "medium"
+    },
+    {
+      "id": "lora-m1",
+      "paper_id": "lora",
+      "question": "Why does LoRA hypothesize that low-rank adaptation is sufficient for large language models?",
+      "answer": "The authors hypothesize that pre-trained language models have a low intrinsic dimensionality, meaning they can be effectively adapted to downstream tasks by modifying parameters in only a small subspace. This is supported by prior work showing that random projections to low-dimensional subspaces still allow effective optimization.",
+      "type": "multi_hop",
+      "source_section": "Section 2 + Section 7.3",
+      "source_page": [2, 8],
+      "difficulty": "hard"
+    },
+    {
+      "id": "lora-m2",
+      "paper_id": "lora",
+      "question": "How does LoRA compare to prefix tuning and adapter layers in terms of both performance and inference efficiency?",
+      "answer": "Unlike adapter layers, LoRA adds no inference latency since the low-rank matrices merge with frozen weights. Unlike prefix tuning, LoRA does not consume part of the available input context length. In experiments, LoRA matched or outperformed both methods on downstream tasks while being more inference-efficient.",
+      "type": "multi_hop",
+      "source_section": "Section 1 + Section 5 + Table 4",
+      "source_page": [1, 5, 6],
       "difficulty": "hard"
     }
   ]
