@@ -46,17 +46,17 @@ lint-fix:
 
 # Eval
 eval:
-	uv run python eval/run_eval.py
+	PYTHONPATH=. uv run python eval/run_eval.py
 
 eval-custom:
-	uv run python eval/run_eval.py --dataset custom
+	PYTHONPATH=. uv run python eval/run_eval.py --dataset custom
 
 # Seed
 seed:
-	uv run python scripts/seed_demo_data.py
+	PYTHONPATH=. uv run python scripts/seed_demo_data.py
 
 seed-custom:
-	uv run python scripts/seed_custom_eval.py
+	PYTHONPATH=. uv run python scripts/seed_custom_eval.py
 
 # Clean
 clean:

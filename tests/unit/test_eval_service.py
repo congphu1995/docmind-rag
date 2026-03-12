@@ -115,16 +115,15 @@ def test_load_custom_questions():
             },
         ],
     }
-    with patch.object(Path, "read_text", return_value=json.dumps(dataset)):
-        questions = load_custom_questions(Path("fake.json"), sample_size=10)
-        assert len(questions) == 2
-        assert questions[0]["question"] == "What was the BLEU score?"
-        assert questions[0]["paper_id"] == "attention-is-all-you-need"
-        assert questions[0]["type"] == "factual"
+    questions = load_custom_questions(dataset, sample_size=10)
+    assert len(questions) == 2
+    assert questions[0]["question"] == "What was the BLEU score?"
+    assert questions[0]["paper_id"] == "attention-is-all-you-need"
+    assert questions[0]["type"] == "factual"
 
-        # Verify sample_size truncation
-        questions_limited = load_custom_questions(Path("fake.json"), sample_size=1)
-        assert len(questions_limited) == 1
+    # Verify sample_size truncation
+    questions_limited = load_custom_questions(dataset, sample_size=1)
+    assert len(questions_limited) == 1
 
 
 def test_load_custom_manifest():

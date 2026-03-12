@@ -9,6 +9,7 @@ dist/
 .ruff_cache/
 *.pdf
 !tests/fixtures/*.pdf
-eval/datasets/*.json
+eval/datasets/seed_manifest.json
+eval/datasets/custom_manifest.json
 docs/
 !docs/UI_TESTING_GUIDE.md

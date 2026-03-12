@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Run RAG evaluation against seeded FinanceBench documents.
+Run RAG evaluation against seeded documents.
 Calls RAGService directly — no HTTP, no Celery.
 
-Usage: uv run python eval/run_eval.py
-Requires: `make seed` to have been run first.
+Usage:
+    uv run python eval/run_eval.py                    # FinanceBench (default)
+    uv run python eval/run_eval.py --dataset custom   # Custom ML/AI papers
+
+Requires: `make seed` or `make seed-custom` to have been run first.
 """
 
 import argparse
@@ -51,9 +54,8 @@ def load_custom_manifest() -> dict:
     }
 
 
-def load_custom_questions(dataset_path: Path, sample_size: int) -> list[dict]:
-    data = json.loads(dataset_path.read_text())
-    questions = data["questions"][:sample_size]
+def load_custom_questions(dataset: dict, sample_size: int) -> list[dict]:
+    questions = dataset["questions"][:sample_size]
     return [
         {
             "question": q["question"],
@@ -344,7 +346,7 @@ async def run_custom_eval(sample_size: int):
     dataset = json.loads(CUSTOM_DATASET_PATH.read_text())
     version = dataset.get("version", "unknown")
 
-    questions = load_custom_questions(CUSTOM_DATASET_PATH, sample_size)
+    questions = load_custom_questions(dataset, sample_size)
     print(f"Questions: {len(questions)} (dataset v{version})\n")
 
     print("Running RAG pipeline...")

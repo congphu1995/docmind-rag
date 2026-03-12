@@ -121,7 +121,7 @@ async def ingest_docs(docs: list[dict], user_id: str) -> list[dict]:
     return manifest_docs
 
 
-async def save_manifest(user_id: str, docs: list[dict]):
+def save_manifest(user_id: str, docs: list[dict]):
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
         "user_id": user_id,
@@ -148,7 +148,7 @@ async def main():
 
         ingested = await ingest_docs(docs, user_id)
 
-    await save_manifest(user_id, ingested)
+    save_manifest(user_id, ingested)
     print(f"\nSeeding complete. {len(ingested)} papers ingested.")
 
 
