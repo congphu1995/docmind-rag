@@ -35,9 +35,12 @@ Total target: ~70-80 questions.
 
 ## Q&A Generation Workflow
 
+This is a manual process — no generation script is built. The steps are:
+
 1. Ingest each paper into the pipeline via `IngestionService`
 2. Feed full paper text to Claude/GPT-4o with structured prompts (one per question type)
 3. Manually verify each Q&A against the actual PDF — correct, discard, or rewrite
+4. Add verified Q&A pairs to `eval/datasets/custom_dataset.json` and bump `version`
 
 ### Generation Prompts
 
@@ -61,11 +64,12 @@ File: `eval/datasets/custom_dataset.json`
 ```json
 {
   "dataset": "docmind-custom",
+  "version": "1.0",
   "papers": [
     {
       "paper_id": "attention-is-all-you-need",
       "title": "Attention Is All You Need",
-      "arxiv_url": "https://arxiv.org/abs/1706.03762",
+      "pdf_url": "https://arxiv.org/pdf/1706.03762",
       "filename": "attention_is_all_you_need.pdf"
     }
   ],
@@ -77,7 +81,7 @@ File: `eval/datasets/custom_dataset.json`
       "answer": "28.4",
       "type": "factual",
       "source_section": "Table 2",
-      "source_page": 8,
+      "source_page": [8],
       "difficulty": "easy"
     },
     {
@@ -87,7 +91,7 @@ File: `eval/datasets/custom_dataset.json`
       "answer": "The big model has 213M parameters compared to 65M for the base model",
       "type": "table_reasoning",
       "source_section": "Table 3",
-      "source_page": 9,
+      "source_page": [9],
       "difficulty": "medium"
     },
     {
@@ -106,16 +110,20 @@ File: `eval/datasets/custom_dataset.json`
 
 ### Key Fields
 
+- `version`: dataset version string, propagated into results for reproducibility
+- `pdf_url`: direct arXiv PDF link (`/pdf/` not `/abs/`), used by seeding script for download
 - `type`: `factual` | `table_reasoning` | `multi_hop` — enables per-type metric breakdown
-- `source_section` + `source_page`: ground truth for retrieval evaluation
-- `difficulty`: `easy` | `medium` | `hard` — for analysis breakdown
+- `source_section` + `source_page`: human-auditing fields for verifying retrieval correctness. Always `list[int]`. Not consumed by RAGAS — RAGAS `ContextRecall` uses the `answer` field as reference (same as current FinanceBench flow)
+- `difficulty`: `easy` | `medium` | `hard` — for future analysis breakdown (not used in metrics output initially)
+- Question ID convention: `{paper_slug}-{type_initial}{sequence}` (e.g., `att-f1`, `bert-t2`, `resnet-m1`)
 
 ## Seeding Script
 
 New script: `scripts/seed_custom_eval.py`
 
 - Reads paper list from `eval/datasets/custom_dataset.json`
-- Downloads PDFs from arXiv URLs
+- Downloads PDFs from each paper's `pdf_url` (direct arXiv PDF links) via `httpx.AsyncClient`
+- Fails fast if any download fails (same as `seed_demo_data.py`)
 - Ingests each via `IngestionService` (same pattern as `seed_demo_data.py`)
 - Writes manifest to `eval/datasets/custom_manifest.json` with `paper_id` → `doc_id` mappings
 
@@ -133,22 +141,33 @@ uv run python eval/run_eval.py --dataset custom
 
 ### Changes to `run_eval.py`
 
-- `load_questions()` reads from local JSON when dataset is `custom` (instead of HuggingFace)
-- Questions scoped to their `paper_id` → matched `doc_id` (per-paper scoping, not all docs)
-- Same pipeline: RAGService.query() → RAGAS metrics → results JSON
+- `load_questions()` reads from local `custom_dataset.json` when dataset is `custom` (instead of HuggingFace)
+- Build a `paper_id → doc_id` lookup from `custom_manifest.json`
+- Per-paper scoping: for each question, resolve `question.paper_id` → `doc_id` via the lookup, then pass `doc_ids=[doc_id]` to `ChatRequest`. This scopes retrieval to only the relevant paper (unlike FinanceBench which passes all doc_ids).
+- Same pipeline otherwise: RAGService.query() → RAGAS metrics → results JSON
+- arXiv download failures in the seed script are fatal — fail fast with a clear error (same behavior as existing `seed_demo_data.py`)
 
 ### Metrics Output
 
-Results saved to `eval/results/custom_results.json` with per-type breakdown:
+Results saved to `eval/results/custom_results.json` with per-type breakdown. All existing metrics are preserved: `retrieval_hit_rate`, `faithfulness`, `answer_relevancy`, `context_recall`, `latency_p95_ms`. The `version` field from the dataset is propagated into results.
 
 ```json
 {
+  "dataset": "docmind-custom",
+  "version": "1.0",
   "metrics": {
-    "overall": { "faithfulness": 0.92, "context_recall": 0.78, "..." : "..." },
+    "overall": {
+      "retrieval_hit_rate": 0.90,
+      "faithfulness": 0.92,
+      "answer_relevancy": 0.85,
+      "context_recall": 0.78,
+      "latency_p95_ms": 15000,
+      "sample_size": 80
+    },
     "by_type": {
-      "factual": { "faithfulness": 0.95, "context_recall": 0.88 },
-      "table_reasoning": { "faithfulness": 0.90, "context_recall": 0.70 },
-      "multi_hop": { "faithfulness": 0.85, "context_recall": 0.60 }
+      "factual": { "retrieval_hit_rate": 0.95, "faithfulness": 0.95, "answer_relevancy": 0.90, "context_recall": 0.88 },
+      "table_reasoning": { "retrieval_hit_rate": 0.88, "faithfulness": 0.90, "answer_relevancy": 0.82, "context_recall": 0.70 },
+      "multi_hop": { "retrieval_hit_rate": 0.80, "faithfulness": 0.85, "answer_relevancy": 0.78, "context_recall": 0.60 }
     }
   }
 }
