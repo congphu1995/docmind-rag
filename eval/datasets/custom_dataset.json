@@ -1,0 +1,98 @@
+{
+  "dataset": "docmind-custom",
+  "version": "1.0",
+  "papers": [
+    {
+      "paper_id": "attention-is-all-you-need",
+      "title": "Attention Is All You Need",
+      "pdf_url": "https://arxiv.org/pdf/1706.03762",
+      "filename": "attention_is_all_you_need.pdf"
+    },
+    {
+      "paper_id": "bert",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "pdf_url": "https://arxiv.org/pdf/1810.04805",
+      "filename": "bert.pdf"
+    },
+    {
+      "paper_id": "resnet",
+      "title": "Deep Residual Learning for Image Recognition",
+      "pdf_url": "https://arxiv.org/pdf/1512.03385",
+      "filename": "resnet.pdf"
+    },
+    {
+      "paper_id": "gpt2",
+      "title": "Language Models are Unsupervised Multitask Learners",
+      "pdf_url": "https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf",
+      "filename": "gpt2.pdf"
+    },
+    {
+      "paper_id": "adam",
+      "title": "Adam: A Method for Stochastic Optimization",
+      "pdf_url": "https://arxiv.org/pdf/1412.6980",
+      "filename": "adam.pdf"
+    },
+    {
+      "paper_id": "batch-norm",
+      "title": "Batch Normalization: Accelerating Deep Network Training",
+      "pdf_url": "https://arxiv.org/pdf/1502.03167",
+      "filename": "batch_norm.pdf"
+    },
+    {
+      "paper_id": "yolo",
+      "title": "You Only Look Once: Unified, Real-Time Object Detection",
+      "pdf_url": "https://arxiv.org/pdf/1506.02640",
+      "filename": "yolo.pdf"
+    },
+    {
+      "paper_id": "gan",
+      "title": "Generative Adversarial Nets",
+      "pdf_url": "https://arxiv.org/pdf/1406.2661",
+      "filename": "gan.pdf"
+    },
+    {
+      "paper_id": "dropout",
+      "title": "Dropout: A Simple Way to Prevent Neural Networks from Overfitting",
+      "pdf_url": "https://jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf",
+      "filename": "dropout.pdf"
+    },
+    {
+      "paper_id": "lora",
+      "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+      "pdf_url": "https://arxiv.org/pdf/2106.09685",
+      "filename": "lora.pdf"
+    }
+  ],
+  "questions": [
+    {
+      "id": "att-f1",
+      "paper_id": "attention-is-all-you-need",
+      "question": "What was the BLEU score of the big Transformer model on the EN-DE WMT 2014 translation task?",
+      "answer": "28.4",
+      "type": "factual",
+      "source_section": "Table 2",
+      "source_page": [8],
+      "difficulty": "easy"
+    },
+    {
+      "id": "att-t1",
+      "paper_id": "attention-is-all-you-need",
+      "question": "How many parameters does the Transformer (big) model have compared to the base model?",
+      "answer": "The big model has 213M parameters compared to 65M for the base model",
+      "type": "table_reasoning",
+      "source_section": "Table 3",
+      "source_page": [9],
+      "difficulty": "medium"
+    },
+    {
+      "id": "att-m1",
+      "paper_id": "attention-is-all-you-need",
+      "question": "Why is self-attention faster than recurrent layers for typical NMT sequence lengths?",
+      "answer": "Self-attention has O(n^2*d) complexity while recurrent layers have O(n*d^2). Since sequence length n is typically smaller than representation dimensionality d in NMT, self-attention is faster.",
+      "type": "multi_hop",
+      "source_section": "Table 1 + Section 4",
+      "source_page": [5, 6],
+      "difficulty": "hard"
+    }
+  ]
+}
