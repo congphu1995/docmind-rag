@@ -6,6 +6,7 @@ all LangChain ChatModel calls (node names, prompts, tokens, cost).
 
 Gracefully disabled when LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY are empty.
 """
+
 import os
 
 from backend.app.core.config import settings
@@ -20,9 +21,9 @@ def configure_langfuse() -> None:
     if not is_langfuse_enabled():
         return
 
-    os.environ.setdefault("LANGFUSE_PUBLIC_KEY", settings.langfuse_public_key)
-    os.environ.setdefault("LANGFUSE_SECRET_KEY", settings.langfuse_secret_key)
-    os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_host)
+    os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse_public_key
+    os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key
+    os.environ["LANGFUSE_HOST"] = settings.langfuse_host
 
 
 def get_langfuse_callback():
@@ -30,5 +31,9 @@ def get_langfuse_callback():
     if not is_langfuse_enabled():
         return None
 
+    # Ensure env vars are set before importing the SDK
+    configure_langfuse()
+
     from langfuse.langchain import CallbackHandler
+
     return CallbackHandler()
