@@ -31,12 +31,12 @@ def _make_state(
 
 
 def test_assess_quality_high_scores():
-    results = [MagicMock(score=0.9), MagicMock(score=0.85), MagicMock(score=0.8)]
+    results = [{"score": 0.9}, {"score": 0.85}, {"score": 0.8}]
     assert _assess_quality(results) > 0.8
 
 
 def test_assess_quality_low_scores():
-    results = [MagicMock(score=0.3), MagicMock(score=0.2)]
+    results = [{"score": 0.3}, {"score": 0.2}]
     assert _assess_quality(results) < 0.4
 
 
@@ -45,17 +45,19 @@ def test_assess_quality_empty():
 
 
 @patch("backend.app.agent.nodes.retriever._fetch_parents")
-@patch("backend.app.agent.nodes.retriever.QdrantWrapper")
+@patch("backend.app.agent.nodes.retriever.VectorStoreFactory")
 @patch("backend.app.agent.nodes.retriever.OpenAIEmbedder")
-async def test_retriever_uses_hyde_query(mock_embedder_cls, mock_qdrant_cls, mock_fetch):
+async def test_retriever_uses_hyde_query(mock_embedder_cls, mock_factory_cls, mock_fetch):
     mock_embedder = AsyncMock()
     mock_embedder_cls.return_value = mock_embedder
     mock_embedder.embed_single = AsyncMock(return_value=[0.1] * 1536)
 
-    mock_qdrant = MagicMock()
-    mock_qdrant_cls.return_value = mock_qdrant
-    mock_qdrant.search = AsyncMock(return_value=[
-        MagicMock(score=0.9, payload={"parent_id": "p1", "doc_id": "d1"})
+    mock_store = AsyncMock()
+    mock_factory_cls.create.return_value = mock_store
+    mock_store.search = AsyncMock(return_value=[
+        {"score": 0.9, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
+         "content_raw": "text", "doc_name": "test.pdf", "type": "text",
+         "page": 1, "section": "s1", "language": "en", "word_count": 50}
     ])
 
     mock_fetch.return_value = [{"content": "result", "score": 0.9, "chunk_id": "c1"}]
@@ -68,18 +70,22 @@ async def test_retriever_uses_hyde_query(mock_embedder_cls, mock_qdrant_cls, moc
 
 
 @patch("backend.app.agent.nodes.retriever._fetch_parents")
-@patch("backend.app.agent.nodes.retriever.QdrantWrapper")
+@patch("backend.app.agent.nodes.retriever.VectorStoreFactory")
 @patch("backend.app.agent.nodes.retriever.OpenAIEmbedder")
-async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_qdrant_cls, mock_fetch):
+async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_factory_cls, mock_fetch):
     mock_embedder = AsyncMock()
     mock_embedder_cls.return_value = mock_embedder
     mock_embedder.embed_single = AsyncMock(return_value=[0.1] * 1536)
 
-    mock_qdrant = MagicMock()
-    mock_qdrant_cls.return_value = mock_qdrant
-    mock_qdrant.search = AsyncMock(side_effect=[
-        [MagicMock(score=0.3, payload={"parent_id": "p1", "doc_id": "d1"})],
-        [MagicMock(score=0.85, payload={"parent_id": "p1", "doc_id": "d1"})],
+    mock_store = AsyncMock()
+    mock_factory_cls.create.return_value = mock_store
+    mock_store.search = AsyncMock(side_effect=[
+        [{"score": 0.3, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
+          "content_raw": "text", "doc_name": "test.pdf", "type": "text",
+          "page": 1, "section": "s1", "language": "en", "word_count": 50}],
+        [{"score": 0.85, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
+          "content_raw": "text", "doc_name": "test.pdf", "type": "text",
+          "page": 1, "section": "s1", "language": "en", "word_count": 50}],
     ])
 
     mock_fetch.return_value = [{"content": "result", "score": 0.85, "chunk_id": "c1"}]
