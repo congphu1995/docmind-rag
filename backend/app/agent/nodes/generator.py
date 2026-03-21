@@ -2,8 +2,13 @@
 Final generation node. Builds prompt with enriched context, generates answer
 with citations, and provides direct_response/direct_llm for non-retrieval paths.
 """
+
 import re
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+
+from backend.app.agent.llm import get_chat_model
 from backend.app.agent.prompts import (
     DIRECT_LLM_SYSTEM,
     GENERATION_PROMPT,
@@ -12,7 +17,6 @@ from backend.app.agent.prompts import (
 )
 from backend.app.agent.state import RAGAgentState
 from backend.app.core.logging import logger
-from backend.app.pipeline.llm.factory import LLMFactory
 
 
 def _build_context(chunks: list[dict]) -> str:
@@ -42,46 +46,47 @@ def _extract_citations(answer: str, chunks: list[dict]) -> list[dict]:
     citations = []
     for i, chunk in enumerate(chunks, 1):
         if i in referenced:
-            citations.append({
-                "source_num": i,
-                "doc_name": chunk.get("doc_name", ""),
-                "page": chunk.get("page", 0),
-                "section": chunk.get("section", ""),
-                "content": chunk.get("content", ""),
-                "score": chunk.get("score", 0.0),
-                "chunk_id": chunk.get("chunk_id", ""),
-            })
+            citations.append(
+                {
+                    "source_num": i,
+                    "doc_name": chunk.get("doc_name", ""),
+                    "page": chunk.get("page", 0),
+                    "section": chunk.get("section", ""),
+                    "content": chunk.get("content", ""),
+                    "score": chunk.get("score", 0.0),
+                    "chunk_id": chunk.get("chunk_id", ""),
+                }
+            )
 
     return citations
 
 
-async def generator_node(state: RAGAgentState) -> dict:
+async def generator_node(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     log = logger.bind(node="generator")
 
-    llm = LLMFactory.create(state["llm_preference"])
+    llm = get_chat_model(state["llm_preference"])
     chunks = state.get("reranked_chunks", [])
     context = _build_context(chunks)
 
-    answer = await llm.complete(
-        messages=[
-            {
-                "role": "user",
-                "content": GENERATION_PROMPT.format(
+    result = await llm.ainvoke(
+        [
+            SystemMessage(content=GENERATION_SYSTEM),
+            HumanMessage(
+                content=GENERATION_PROMPT.format(
                     context=context,
                     query=state["original_query"],
-                ),
-            }
+                )
+            ),
         ],
-        system=GENERATION_SYSTEM,
-        max_tokens=4096,
-        temperature=0.1,
+        config=config,
     )
+    answer = result.content
 
     citations = _extract_citations(answer, chunks)
 
     log.info(
         "generation_done",
-        llm=llm.model_name,
+        llm=state["llm_preference"],
         citations=len(citations),
         answer_words=len(answer.split()),
     )
@@ -91,12 +96,12 @@ async def generator_node(state: RAGAgentState) -> dict:
         "citations": citations,
         "agent_trace": [
             f"Generated answer with {len(citations)} citations "
-            f"(llm={llm.model_name})"
+            f"(llm={state['llm_preference']})"
         ],
     }
 
 
-async def direct_response(state: RAGAgentState) -> dict:
+async def direct_response(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     """Greeting response — no LLM call needed."""
     return {
         "answer": GREETING_RESPONSE,
@@ -105,22 +110,20 @@ async def direct_response(state: RAGAgentState) -> dict:
     }
 
 
-async def direct_llm(state: RAGAgentState) -> dict:
+async def direct_llm(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     """General knowledge — LLM without retrieval."""
-    llm = LLMFactory.create(state["llm_preference"])
+    llm = get_chat_model(state["llm_preference"])
 
-    answer = await llm.complete(
-        messages=[
-            {"role": "user", "content": state["original_query"]}
+    result = await llm.ainvoke(
+        [
+            SystemMessage(content=DIRECT_LLM_SYSTEM),
+            HumanMessage(content=state["original_query"]),
         ],
-        system=DIRECT_LLM_SYSTEM,
-        max_tokens=1024,
+        config=config,
     )
 
     return {
-        "answer": answer,
+        "answer": result.content,
         "citations": [],
-        "agent_trace": [
-            f"Direct LLM — no retrieval (llm={llm.model_name})"
-        ],
+        "agent_trace": [f"Direct LLM — no retrieval (llm={state['llm_preference']})"],
     }

@@ -5,6 +5,7 @@ Adaptive retriever with retry loop.
 3. Retry with expanded query if quality < threshold
 4. Fetch parent chunks from PostgreSQL for richer LLM context
 """
+
 import time
 
 from sqlalchemy import select
@@ -15,8 +16,11 @@ from backend.app.core.database import AsyncSessionLocal
 from backend.app.core.logging import logger
 from backend.app.core.metrics import RETRIEVAL_DURATION
 from backend.app.models.document import ParentChunk
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+
+from backend.app.agent.llm import get_mini_model
 from backend.app.pipeline.embedders.openai_embedder import OpenAIEmbedder
-from backend.app.pipeline.llm.factory import LLMFactory
 from backend.app.vectorstore.qdrant_client import QdrantWrapper
 
 
@@ -38,9 +42,7 @@ async def _fetch_parents(child_results: list) -> list[dict]:
     Atomic chunks (no parent_id) pass through directly.
     """
     parent_ids = {
-        r.payload.get("parent_id")
-        for r in child_results
-        if r.payload.get("parent_id")
+        r.payload.get("parent_id") for r in child_results if r.payload.get("parent_id")
     }
 
     parents = {}
@@ -59,44 +61,50 @@ async def _fetch_parents(child_results: list) -> list[dict]:
 
         if parent_id and parent_id in parents and parent_id not in seen_parents:
             parent = parents[parent_id]
-            chunks.append({
-                "content": parent.content_raw,
-                "content_markdown": parent.content_markdown,
-                "doc_id": parent.doc_id,
-                "doc_name": r.payload.get("doc_name", ""),
-                "page": parent.page,
-                "section": parent.section,
-                "type": parent.type,
-                "score": r.score,
-                "chunk_id": parent.chunk_id,
-            })
+            chunks.append(
+                {
+                    "content": parent.content_raw,
+                    "content_markdown": parent.content_markdown,
+                    "doc_id": parent.doc_id,
+                    "doc_name": r.payload.get("doc_name", ""),
+                    "page": parent.page,
+                    "section": parent.section,
+                    "type": parent.type,
+                    "score": r.score,
+                    "chunk_id": parent.chunk_id,
+                }
+            )
             seen_parents.add(parent_id)
 
         elif not parent_id:
             # Atomic chunk (table, figure) — no parent, use child directly
-            chunks.append({
-                "content": r.payload.get("content_raw", ""),
-                "content_markdown": r.payload.get("content_markdown"),
-                "doc_id": r.payload.get("doc_id", ""),
-                "doc_name": r.payload.get("doc_name", ""),
-                "page": r.payload.get("page", 0),
-                "section": r.payload.get("section", ""),
-                "type": r.payload.get("type", "text"),
-                "score": r.score,
-                "chunk_id": r.payload.get("chunk_id", ""),
-            })
+            chunks.append(
+                {
+                    "content": r.payload.get("content_raw", ""),
+                    "content_markdown": r.payload.get("content_markdown"),
+                    "doc_id": r.payload.get("doc_id", ""),
+                    "doc_name": r.payload.get("doc_name", ""),
+                    "page": r.payload.get("page", 0),
+                    "section": r.payload.get("section", ""),
+                    "type": r.payload.get("type", "text"),
+                    "score": r.score,
+                    "chunk_id": r.payload.get("chunk_id", ""),
+                }
+            )
 
     return chunks
 
 
-async def retriever_node(state: RAGAgentState) -> dict:
+async def retriever_node(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     log = logger.bind(node="retriever")
 
     embedder = OpenAIEmbedder()
     qdrant = QdrantWrapper()
 
     # Use HyDE query if available, otherwise rewritten query
-    query_text = state.get("hyde_query") or state["rewritten_query"] or state["original_query"]
+    query_text = (
+        state.get("hyde_query") or state["rewritten_query"] or state["original_query"]
+    )
 
     # Build Qdrant filters
     filters = {}
@@ -127,23 +135,26 @@ async def retriever_node(state: RAGAgentState) -> dict:
             quality=round(quality, 3),
         )
 
-        if quality >= settings.retrieval_quality_threshold or attempt == MAX_ATTEMPTS - 1:
+        if (
+            quality >= settings.retrieval_quality_threshold
+            or attempt == MAX_ATTEMPTS - 1
+        ):
             break
 
         # Retry: expand query
         if attempt == 0:
-            llm = LLMFactory.create_mini()
-            query_text = await llm.complete(
-                messages=[{
-                    "role": "user",
-                    "content": f"Rephrase this for better document search. "
-                               f"Add synonyms and related terms. "
-                               f"Output ONLY the query:\n\n{state['original_query']}",
-                }],
-                max_tokens=100,
-                temperature=0.3,
+            llm = get_mini_model().bind(temperature=0.3, max_tokens=100)
+            result = await llm.ainvoke(
+                [
+                    HumanMessage(
+                        content=f"Rephrase this for better document search. "
+                        f"Add synonyms and related terms. "
+                        f"Output ONLY the query:\n\n{state['original_query']}"
+                    )
+                ],
+                config=config,
             )
-            query_text = query_text.strip()
+            query_text = result.content.strip()
         elif attempt == 1 and state.get("sub_questions"):
             # Attempt 3: try first sub-question
             query_text = state["sub_questions"][0]

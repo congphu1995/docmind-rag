@@ -2,6 +2,7 @@
 Reranks retrieved chunks. Identity (passthrough) by default.
 Swap to Cohere via config — no code changes needed.
 """
+
 import time
 
 from backend.app.agent.state import RAGAgentState
@@ -24,16 +25,13 @@ async def reranker_node(state: RAGAgentState) -> dict:
         chunks=chunks,
         top_n=settings.reranker_top_n,
     )
-    RERANKER_DURATION.labels(strategy=strategy).observe(
-        time.perf_counter() - start
-    )
+    RERANKER_DURATION.labels(strategy=strategy).observe(time.perf_counter() - start)
 
     log.info("reranked", before=len(chunks), after=len(reranked), strategy=strategy)
 
     return {
         "reranked_chunks": reranked,
         "agent_trace": [
-            f"Reranked: {len(chunks)} → {len(reranked)} chunks "
-            f"(strategy={strategy})"
+            f"Reranked: {len(chunks)} → {len(reranked)} chunks (strategy={strategy})"
         ],
     }

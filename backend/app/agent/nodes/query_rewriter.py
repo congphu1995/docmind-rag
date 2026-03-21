@@ -1,22 +1,21 @@
 """
 Rewrites query for optimal retrieval.
 Conditional HyDE: only for analytical and multi_hop queries.
-Decision based on query_analyzer LLM classification.
 """
+
 import time
 
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+
+from backend.app.agent.llm import get_mini_model
 from backend.app.agent.prompts import HYDE_PROMPT, QUERY_REWRITE_PROMPT
 from backend.app.agent.state import RAGAgentState
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
-from backend.app.pipeline.llm.factory import LLMFactory
 
 
 def _should_use_hyde(query: str, query_type: str) -> bool:
-    """
-    Decide whether HyDE is beneficial for this query.
-    Relies on query_analyzer LLM classification — no manual regex rules.
-    """
     if query_type in ("greeting", "general"):
         return False
     if query_type in ("multi_hop", "analytical"):
@@ -24,44 +23,35 @@ def _should_use_hyde(query: str, query_type: str) -> bool:
     return False
 
 
-async def query_rewriter(state: RAGAgentState) -> dict:
+async def query_rewriter(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     query = state["original_query"]
     query_type = state["query_type"]
     log = logger.bind(node="query_rewriter")
 
-    llm = LLMFactory.create_mini()
+    llm = get_mini_model().bind(temperature=0, max_tokens=150)
 
-    # Rewrite: expand abbreviations, resolve references
-    rewritten = await llm.complete(
-        messages=[
-            {
-                "role": "user",
-                "content": QUERY_REWRITE_PROMPT.format(
-                    query=query,
-                    context="",  # TODO: pass conversation history
-                ),
-            }
+    rewrite_result = await llm.ainvoke(
+        [
+            HumanMessage(content=QUERY_REWRITE_PROMPT.format(query=query, context="")),
         ],
-        max_tokens=150,
-        temperature=0,
+        config=config,
     )
-    rewritten = rewritten.strip()
+    rewritten = rewrite_result.content.strip()
 
-    # Conditional HyDE
     hyde_query = ""
     hyde_used = False
     trace_parts = [f"Rewritten: '{rewritten}'"]
 
     if _should_use_hyde(query, query_type):
         start = time.perf_counter()
-        hyde_query = await llm.complete(
-            messages=[
-                {"role": "user", "content": HYDE_PROMPT.format(query=rewritten)}
-            ],
-            max_tokens=settings.hyde_max_tokens,
-            temperature=0.3,
+        hyde_llm = get_mini_model().bind(
+            temperature=0.3, max_tokens=settings.hyde_max_tokens
         )
-        hyde_query = hyde_query.strip()
+        hyde_result = await hyde_llm.ainvoke(
+            [HumanMessage(content=HYDE_PROMPT.format(query=rewritten))],
+            config=config,
+        )
+        hyde_query = hyde_result.content.strip()
         hyde_used = True
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         trace_parts.append(

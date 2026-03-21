@@ -2,30 +2,31 @@
 First node in the agent pipeline.
 Classifies query type, detects language, extracts metadata filters.
 """
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+
+from backend.app.agent.llm import get_mini_model
 from backend.app.agent.prompts import QUERY_ANALYSIS_PROMPT, QUERY_ANALYSIS_SYSTEM
 from backend.app.agent.state import RAGAgentState
 from backend.app.core.logging import logger
-from backend.app.pipeline.llm.factory import LLMFactory
 from backend.app.schemas.chat import QueryAnalysis
 
 
-async def query_analyzer(state: RAGAgentState) -> dict:
+async def query_analyzer(state: RAGAgentState, config: RunnableConfig = None) -> dict:
     query = state["original_query"]
     log = logger.bind(node="query_analyzer")
 
     try:
-        llm = LLMFactory.create_mini()
-        analysis = await llm.complete_structured(
-            messages=[
-                {
-                    "role": "user",
-                    "content": QUERY_ANALYSIS_PROMPT.format(query=query),
-                }
+        llm = get_mini_model()
+        structured_llm = llm.with_structured_output(QueryAnalysis)
+
+        analysis = await structured_llm.ainvoke(
+            [
+                SystemMessage(content=QUERY_ANALYSIS_SYSTEM),
+                HumanMessage(content=QUERY_ANALYSIS_PROMPT.format(query=query)),
             ],
-            response_model=QueryAnalysis,
-            system=QUERY_ANALYSIS_SYSTEM,
-            max_tokens=200,
-            temperature=0,
+            config=config,
         )
 
         log.info(
@@ -40,8 +41,7 @@ async def query_analyzer(state: RAGAgentState) -> dict:
             "sub_questions": analysis.sub_questions,
             "extracted_filters": analysis.filters.model_dump(exclude_defaults=True),
             "agent_trace": [
-                f"Query classified as: {analysis.query_type} "
-                f"(lang={analysis.language})"
+                f"Query classified as: {analysis.query_type} (lang={analysis.language})"
             ],
         }
 
