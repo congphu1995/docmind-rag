@@ -1,9 +1,7 @@
 """
-Requires: Qdrant + PostgreSQL running (docker compose up qdrant postgres)
+Requires: Elasticsearch + PostgreSQL running (docker compose up elasticsearch postgres)
 Run with: pytest tests/integration/ -m integration
 """
-import os
-
 import pytest
 
 
@@ -27,7 +25,7 @@ async def test_full_ingestion_pipeline(sample_pdf_path):
 @pytest.mark.integration
 async def test_delete_removes_from_stores(sample_pdf_path):
     from backend.app.services.ingestion import IngestionService
-    from backend.app.vectorstore.qdrant_client import QdrantWrapper
+    from backend.app.vectorstore.factory import VectorStoreFactory
 
     service = IngestionService()
     result = await service.ingest(sample_pdf_path, "test.pdf")
@@ -35,9 +33,6 @@ async def test_delete_removes_from_stores(sample_pdf_path):
 
     await service.delete_document(doc_id)
 
-    qdrant = QdrantWrapper()
-    search_results = await qdrant.search(
-        vector=[0.0] * 1536,
-        filters={"doc_ids": [doc_id]},
-    )
-    assert len(search_results) == 0
+    vectorstore = VectorStoreFactory.create()
+    remaining = await vectorstore.get_by_doc_id(doc_id)
+    assert len(remaining) == 0

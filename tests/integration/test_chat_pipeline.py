@@ -1,5 +1,5 @@
 """
-Requires: Qdrant + PostgreSQL running (docker compose up qdrant postgres)
+Requires: Elasticsearch + PostgreSQL running (docker compose up elasticsearch postgres)
 Requires: OPENAI_API_KEY set (for embeddings + gpt-4o-mini)
 Run with: pytest tests/integration/test_chat_pipeline.py -m integration
 """
