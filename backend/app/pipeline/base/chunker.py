@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
@@ -12,6 +13,7 @@ class Chunk:
     parent_id: Optional[str] = None
     doc_id: str = ""
     doc_name: str = ""
+    user_id: str = ""
 
     content: str = ""
     content_raw: str = ""
@@ -27,21 +29,26 @@ class Chunk:
 
     metadata: dict = field(default_factory=dict)
 
-    def qdrant_payload(self) -> dict:
-        """Flat dict for Qdrant payload storage."""
+    def to_document(self) -> dict:
+        """Serialize chunk to a dict suitable for any vector store."""
         return {
             "chunk_id": self.chunk_id,
             "parent_id": self.parent_id,
             "doc_id": self.doc_id,
             "doc_name": self.doc_name,
+            "user_id": self.user_id,
+            "content": self.content,
             "content_raw": self.content_raw,
             "content_markdown": self.content_markdown,
+            "content_html": self.content_html,
             "type": self.type,
             "page": self.page,
             "section": self.section,
             "language": self.language,
             "word_count": self.word_count,
-            **self.metadata,
+            "is_parent": self.is_parent,
+            "metadata": self.metadata,
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -54,7 +61,7 @@ class BaseChunker(ABC):
     ) -> tuple[list[Chunk], list[Chunk]]:
         """
         Returns (parent_chunks, child_chunks).
-        parent_chunks → PostgreSQL
-        child_chunks  → Qdrant (embedded)
+        parent_chunks → stored for LLM context
+        child_chunks  → embedded for retrieval
         """
         ...

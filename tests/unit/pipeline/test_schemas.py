@@ -57,25 +57,46 @@ def test_parsed_element_word_count():
     assert el.word_count() == 4
 
 
-def test_chunk_qdrant_payload_is_flat():
-    chunk = Chunk(doc_id="abc", content="test", content_raw="test", page=1)
-    payload = chunk.qdrant_payload()
-    assert isinstance(payload, dict)
-    assert "doc_id" in payload
-    assert "content_raw" in payload
-    assert all(not isinstance(v, dict) for v in payload.values())
+def test_chunk_to_document_includes_all_fields():
+    chunk = Chunk(
+        doc_id="abc",
+        content="enriched text",
+        content_raw="raw text",
+        content_html="<p>raw text</p>",
+        page=1,
+        is_parent=False,
+        user_id="user1",
+        metadata={"doc_type": "report"},
+    )
+    doc = chunk.to_document()
+    assert isinstance(doc, dict)
+    assert doc["doc_id"] == "abc"
+    assert doc["content"] == "enriched text"
+    assert doc["content_raw"] == "raw text"
+    assert doc["content_html"] == "<p>raw text</p>"
+    assert doc["user_id"] == "user1"
+    assert doc["is_parent"] is False
+    assert doc["metadata"] == {"doc_type": "report"}
+    assert "created_at" in doc
 
 
-def test_chunk_qdrant_payload_includes_metadata():
+def test_chunk_to_document_metadata_is_nested():
+    """Metadata must be a nested dict, not flattened into top-level keys."""
     chunk = Chunk(
         doc_id="abc",
         content="test",
         content_raw="test",
         metadata={"doc_type": "report", "date": "2024-01-01"},
     )
-    payload = chunk.qdrant_payload()
-    assert payload["doc_type"] == "report"
-    assert payload["date"] == "2024-01-01"
+    doc = chunk.to_document()
+    assert "metadata" in doc
+    assert doc["metadata"]["doc_type"] == "report"
+    assert "doc_type" not in doc
+
+
+def test_chunk_default_user_id():
+    chunk = Chunk()
+    assert chunk.user_id == ""
 
 
 def test_chunk_default_values():
