@@ -148,7 +148,9 @@ class RAGService:
         yield self._build_meta_event(state, request.llm)
 
         # Phase 6: Stream generation
-        llm = get_chat_model(request.llm).bind(temperature=0.1, max_tokens=4096)
+        llm = get_chat_model(request.llm, streaming=True).bind(
+            temperature=0.1, max_tokens=4096
+        )
         context = _build_context(state.get("reranked_chunks", []))
         messages = [
             SystemMessage(content=GENERATION_SYSTEM),

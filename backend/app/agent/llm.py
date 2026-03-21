@@ -12,7 +12,11 @@ from langchain_openai import ChatOpenAI
 from backend.app.core.config import settings
 
 
-def get_chat_model(provider: str | None = None, model: str | None = None):
+def get_chat_model(
+    provider: str | None = None,
+    model: str | None = None,
+    streaming: bool = False,
+):
     """Create a LangChain ChatModel for the given provider."""
     provider = provider or settings.default_llm
 
@@ -20,11 +24,13 @@ def get_chat_model(provider: str | None = None, model: str | None = None):
         return ChatOpenAI(
             model=model or "gpt-4o",
             api_key=settings.openai_api_key,
+            streaming=streaming,
         )
     elif provider == "claude":
         return ChatAnthropic(
             model_name=model or "claude-sonnet-4-20250514",
             api_key=settings.anthropic_api_key,
+            streaming=streaming,
         )
 
     raise ValueError(f"Unknown LLM provider: {provider}. Choose: openai, claude")
