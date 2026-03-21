@@ -9,6 +9,7 @@ from backend.app.core.database import create_tables
 from backend.app.core.langfuse import configure_langfuse
 from backend.app.core.logging import configure_logging
 from backend.app.core.middleware import PrometheusMiddleware
+from backend.app.vectorstore.factory import VectorStoreFactory
 
 
 @asynccontextmanager
@@ -16,6 +17,8 @@ async def lifespan(app: FastAPI):
     configure_langfuse()
     configure_logging()
     await create_tables()
+    vectorstore = VectorStoreFactory.create()
+    await vectorstore.initialize()
     yield
 
 
