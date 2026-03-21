@@ -1,13 +1,21 @@
 services:
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
+  elasticsearch:
+    image: elasticsearch:8.15.0
     environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   postgres:
     image: postgres:15-alpine
@@ -158,15 +166,18 @@ services:
       - "8000:8000"
     env_file: .env
     environment:
-      - QDRANT_HOST=qdrant
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
       - REDIS_URL=redis://redis:6379/0
       - LANGFUSE_HOST=http://langfuse:3000
       - TZ=Asia/Ho_Chi_Minh
     depends_on:
-      - qdrant
-      - postgres
-      - redis
+      elasticsearch:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
 
   worker:
     build:
@@ -175,15 +186,18 @@ services:
     command: uv run celery -A backend.app.workers.celery_app worker --loglevel=info
     env_file: .env
     environment:
-      - QDRANT_HOST=qdrant
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
       - REDIS_URL=redis://redis:6379/0
       - LANGFUSE_HOST=http://langfuse:3000
       - TZ=Asia/Ho_Chi_Minh
     depends_on:
-      - qdrant
-      - postgres
-      - redis
+      elasticsearch:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
 
   frontend:
     build:
@@ -216,7 +230,7 @@ services:
       - prometheus
 
 volumes:
-  qdrant_data:
+  elasticsearch_data:
   postgres_data:
   langfuse_db_data:
   langfuse_clickhouse_data:

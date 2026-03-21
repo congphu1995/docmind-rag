@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     qdrant_collection: str = "docmind_chunks"
 
+    # Elasticsearch
+    vectorstore_strategy: str = "elasticsearch"
+    elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_index: str = "docmind_chunks"
+    elasticsearch_username: str = ""
+    elasticsearch_password: str = ""
+    rrf_k: int = 60
+    es_bulk_batch_size: int = 100
+
     # PostgreSQL
     postgres_url: str = "postgresql+asyncpg://docmind:docmind@localhost:5432/docmind"
 
