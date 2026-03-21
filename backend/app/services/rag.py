@@ -3,10 +3,16 @@ Orchestrates the RAG agent pipeline.
 - query(): Non-streaming — runs full graph, returns complete response.
 - stream_query(): Streaming — runs nodes sequentially, streams generation via SSE.
 """
+
 import json
 from typing import AsyncGenerator
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+
 from backend.app.agent.graph import build_graph
+from backend.app.agent.llm import get_chat_model
+from backend.app.agent.nodes.decomposer import decomposer
 from backend.app.agent.nodes.generator import (
     _build_context,
     direct_llm,
@@ -14,18 +20,16 @@ from backend.app.agent.nodes.generator import (
 )
 from backend.app.agent.nodes.query_analyzer import query_analyzer
 from backend.app.agent.nodes.query_rewriter import query_rewriter
-from backend.app.agent.nodes.decomposer import decomposer
 from backend.app.agent.nodes.reranker import reranker_node
 from backend.app.agent.nodes.retriever import retriever_node
 from backend.app.agent.prompts import GENERATION_PROMPT, GENERATION_SYSTEM
 from backend.app.agent.state import RAGAgentState
+from backend.app.core.langfuse import get_langfuse_callback
 from backend.app.core.logging import logger
-from backend.app.pipeline.llm.factory import LLMFactory
 from backend.app.schemas.chat import ChatRequest
 
 
 class RAGService:
-
     def __init__(self):
         self._graph = build_graph()
 
@@ -51,13 +55,22 @@ class RAGService:
             "error": "",
         }
 
+    def _build_config(self) -> dict:
+        """Build LangGraph config with Langfuse callback if enabled."""
+        cb = get_langfuse_callback()
+        if cb:
+            return {"callbacks": [cb]}
+        return {}
+
     async def query(self, request: ChatRequest) -> dict:
         """Non-streaming: run full graph, return complete response."""
         log = logger.bind(question=request.question[:80])
         log.info("rag_query_start")
 
         state = self._build_initial_state(request)
-        result = await self._graph.ainvoke(state)
+        config = self._build_config()
+
+        result = await self._graph.ainvoke(state, config=config)
 
         log.info(
             "rag_query_done",
@@ -88,16 +101,18 @@ class RAGService:
         log.info("rag_stream_start")
 
         state = self._build_initial_state(request)
+        config = self._build_config()
+        runnable_config = RunnableConfig(**config) if config else None
 
         # Phase 1: Query analysis
-        analyzer_result = await query_analyzer(state)
+        analyzer_result = await query_analyzer(state, runnable_config)
         state = {**state, **analyzer_result}
 
         query_type = state["query_type"]
 
         # Handle non-retrieval paths
         if query_type == "greeting":
-            result = await direct_response(state)
+            result = await direct_response(state, runnable_config)
             state = {**state, **result}
             yield self._build_meta_event(state, request.llm)
             yield state["answer"]
@@ -105,7 +120,7 @@ class RAGService:
             return
 
         if query_type == "general":
-            result = await direct_llm(state)
+            result = await direct_llm(state, runnable_config)
             state = {**state, **result}
             yield self._build_meta_event(state, request.llm)
             yield state["answer"]
@@ -114,15 +129,15 @@ class RAGService:
 
         # Phase 2: Decompose (multi_hop only)
         if query_type == "multi_hop":
-            decompose_result = await decomposer(state)
+            decompose_result = await decomposer(state, runnable_config)
             state = {**state, **decompose_result}
 
         # Phase 3: Query rewrite + conditional HyDE
-        rewrite_result = await query_rewriter(state)
+        rewrite_result = await query_rewriter(state, runnable_config)
         state = {**state, **rewrite_result}
 
         # Phase 4: Retrieval with adaptive retry
-        retrieval_result = await retriever_node(state)
+        retrieval_result = await retriever_node(state, runnable_config)
         state = {**state, **retrieval_result}
 
         # Phase 5: Rerank
@@ -133,22 +148,23 @@ class RAGService:
         yield self._build_meta_event(state, request.llm)
 
         # Phase 6: Stream generation
-        llm = LLMFactory.create(request.llm)
+        llm = get_chat_model(request.llm).bind(temperature=0.1, max_tokens=4096)
         context = _build_context(state.get("reranked_chunks", []))
-        prompt = GENERATION_PROMPT.format(
-            context=context,
-            query=state["original_query"],
-        )
+        messages = [
+            SystemMessage(content=GENERATION_SYSTEM),
+            HumanMessage(
+                content=GENERATION_PROMPT.format(
+                    context=context,
+                    query=state["original_query"],
+                )
+            ),
+        ]
 
         full_answer = ""
-        async for token in llm.stream(
-            messages=[{"role": "user", "content": prompt}],
-            system=GENERATION_SYSTEM,
-            max_tokens=4096,
-            temperature=0.1,
-        ):
-            full_answer += token
-            yield token
+        async for chunk in llm.astream(messages, config=runnable_config):
+            if chunk.content:
+                full_answer += chunk.content
+                yield chunk.content
 
         yield "[DONE]"
 
@@ -160,17 +176,18 @@ class RAGService:
 
     def _build_meta_event(self, state: dict, llm_used: str) -> str:
         """Build __META__ SSE event with sources and agent trace."""
-        # Build source list from reranked chunks
         sources = []
         for i, chunk in enumerate(state.get("reranked_chunks", []), 1):
-            sources.append({
-                "source_num": i,
-                "doc_name": chunk.get("doc_name", ""),
-                "page": chunk.get("page", 0),
-                "section": chunk.get("section", ""),
-                "content": chunk.get("content", ""),
-                "score": chunk.get("score", 0.0),
-            })
+            sources.append(
+                {
+                    "source_num": i,
+                    "doc_name": chunk.get("doc_name", ""),
+                    "page": chunk.get("page", 0),
+                    "section": chunk.get("section", ""),
+                    "content": chunk.get("content", ""),
+                    "score": chunk.get("score", 0.0),
+                }
+            )
 
         meta = {
             "sources": sources,
