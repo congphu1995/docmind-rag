@@ -3,6 +3,7 @@
 Download FinanceBench dataset from HuggingFace and save as JSON.
 Usage: uv run python eval/datasets/download_financebench.py
 """
+
 import json
 import sys
 from pathlib import Path
@@ -24,13 +25,15 @@ def main():
 
     questions = []
     for item in ds:
-        questions.append({
-            "question": item["question"],
-            "answer": item.get("answer", ""),
-            "doc_name": item.get("doc_name", ""),
-            "page_num": item.get("page_num", ""),
-            "category": item.get("question_type", ""),
-        })
+        questions.append(
+            {
+                "question": item["question"],
+                "answer": item.get("answer", ""),
+                "doc_name": item.get("doc_name", ""),
+                "page_num": item.get("page_num", ""),
+                "category": item.get("question_type", ""),
+            }
+        )
 
     with open(output_path, "w") as f:
         json.dump(questions, f, indent=2)
@@ -40,13 +43,16 @@ def main():
     # Also save questions matched to seed companies
     seed_companies = ["APPLE", "MICROSOFT", "AMAZON", "ALPHABET", "META PLATFORMS"]
     matched = [
-        q for q in questions
+        q
+        for q in questions
         if any(c in q.get("doc_name", "").upper() for c in seed_companies)
     ]
     matched_path = output_dir / "financebench_matched.json"
     with open(matched_path, "w") as f:
         json.dump(matched, f, indent=2)
-    print(f"Saved {len(matched)} matched questions (for 5 seed companies) to {matched_path}")
+    print(
+        f"Saved {len(matched)} matched questions (for 5 seed companies) to {matched_path}"
+    )
 
     # Print summary
     categories = {}

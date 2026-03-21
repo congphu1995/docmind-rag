@@ -29,15 +29,19 @@ class ChatResponse(BaseModel):
 
 class QueryFilters(BaseModel):
     """Extracted metadata filters from query."""
+
     model_config = {"extra": "forbid"}
 
     doc_type: str = Field(default="", description="Document type filter if mentioned")
     date_range: str = Field(default="", description="Date range if mentioned")
-    organization: str = Field(default="", description="Organization filter if mentioned")
+    organization: str = Field(
+        default="", description="Organization filter if mentioned"
+    )
 
 
 class QueryAnalysis(BaseModel):
     """Structured output for query classification."""
+
     query_type: str = Field(
         description="One of: factual|analytical|tabular|multi_hop|general|greeting"
     )

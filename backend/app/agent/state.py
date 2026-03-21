@@ -2,6 +2,7 @@
 LangGraph typed state — flows through every agent node.
 Uses Annotated with operator.add for agent_trace accumulation.
 """
+
 import operator
 from typing import Annotated, TypedDict
 
@@ -10,17 +11,17 @@ class RAGAgentState(TypedDict):
     # ── Input ────────────────────────────────────────────────
     original_query: str
     doc_ids: list[str]
-    llm_preference: str              # "claude" | "openai"
+    llm_preference: str  # "claude" | "openai"
 
     # ── Query Understanding ──────────────────────────────────
-    query_type: str                  # factual|analytical|tabular|multi_hop|general|greeting
+    query_type: str  # factual|analytical|tabular|multi_hop|general|greeting
     sub_questions: list[str]
     extracted_filters: dict
     detected_language: str
 
     # ── Query Rewriting ──────────────────────────────────────
     rewritten_query: str
-    hyde_query: str                  # empty string if HyDE skipped
+    hyde_query: str  # empty string if HyDE skipped
     hyde_used: bool
 
     # ── Retrieval ────────────────────────────────────────────
@@ -34,5 +35,5 @@ class RAGAgentState(TypedDict):
     citations: list[dict]
 
     # ── Observability ────────────────────────────────────────
-    agent_trace: Annotated[list[str], operator.add]   # accumulates across nodes
+    agent_trace: Annotated[list[str], operator.add]  # accumulates across nodes
     error: str

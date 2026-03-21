@@ -5,7 +5,6 @@ from backend.app.pipeline.base.chunker import Chunk
 
 
 class BaseVectorStore(ABC):
-
     @abstractmethod
     async def initialize(self) -> None:
         """Create index/collection if not exists."""

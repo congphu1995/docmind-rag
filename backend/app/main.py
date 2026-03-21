@@ -36,12 +36,8 @@ app.add_middleware(
 )
 app.add_middleware(PrometheusMiddleware)
 
-app.include_router(
-    documents.router, prefix="/api/v1/documents", tags=["documents"]
-)
-app.include_router(
-    chat.router, prefix="/api/v1/chat", tags=["chat"]
-)
+app.include_router(documents.router, prefix="/api/v1/documents", tags=["documents"])
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(chunks.router, prefix="/api/v1", tags=["chunks"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])

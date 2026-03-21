@@ -13,7 +13,6 @@ from backend.app.pipeline.parsers.normalizer import ElementNormalizer
 
 
 class PyMuPDFParser(BaseParser):
-
     def __init__(self):
         self._normalizer = ElementNormalizer()
 

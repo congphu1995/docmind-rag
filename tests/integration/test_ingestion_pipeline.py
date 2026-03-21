@@ -2,6 +2,7 @@
 Requires: Elasticsearch + PostgreSQL running (docker compose up elasticsearch postgres)
 Run with: pytest tests/integration/ -m integration
 """
+
 import pytest
 
 

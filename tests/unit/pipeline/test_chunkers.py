@@ -5,9 +5,7 @@ from backend.app.pipeline.chunkers.quality_filter import QualityFilter
 from backend.app.pipeline.chunkers.smart_router import SmartRouter
 
 
-def make_element(
-    type: ElementType, content: str, page: int = 0
-) -> ParsedElement:
+def make_element(type: ElementType, content: str, page: int = 0) -> ParsedElement:
     return ParsedElement(
         type=type, content=content, page=page, doc_id="test", doc_name="test.pdf"
     )
@@ -38,7 +36,9 @@ def test_title_creates_section_boundary_not_chunk():
 
 
 def test_children_have_parent_id():
-    chunker = ParentChildChunker(parent_max_words=50, child_min_words=5, child_max_words=15)
+    chunker = ParentChildChunker(
+        parent_max_words=50, child_min_words=5, child_max_words=15
+    )
     long_text = "word " * 200
     elements = [make_element(ElementType.TEXT, long_text)]
     parents, children = chunker.chunk(elements, {})
@@ -81,9 +81,7 @@ def test_quality_filter_keeps_tables():
 
 def test_quality_filter_keeps_parents():
     filt = QualityFilter()
-    parent = Chunk(
-        content_raw="short", content="short", type="text", is_parent=True
-    )
+    parent = Chunk(content_raw="short", content="short", type="text", is_parent=True)
     result = filt.filter([parent])
     assert parent in result
 
@@ -168,8 +166,8 @@ def test_large_section_split_at_paragraphs():
     chunker = ParentChildChunker(parent_max_words=100)
     # Create a section with multiple paragraphs totaling > 100 words
     para1 = "First paragraph sentence. " * 15  # ~45 words
-    para2 = "Second paragraph content. " * 15   # ~45 words
-    para3 = "Third paragraph material. " * 15    # ~45 words
+    para2 = "Second paragraph content. " * 15  # ~45 words
+    para3 = "Third paragraph material. " * 15  # ~45 words
     big_text = f"{para1}\n\n{para2}\n\n{para3}"
     elements = [
         make_element(ElementType.TITLE, "# Big Section"),
@@ -184,8 +182,8 @@ def test_large_section_split_at_paragraphs():
 def test_no_title_document_still_produces_parents():
     """Documents with no titles fall back to paragraph-based parents."""
     chunker = ParentChildChunker(parent_max_words=50)
-    para1 = "First paragraph. " * 20     # ~40 words
-    para2 = "Second paragraph. " * 20    # ~40 words
+    para1 = "First paragraph. " * 20  # ~40 words
+    para2 = "Second paragraph. " * 20  # ~40 words
     elements = [
         make_element(ElementType.TEXT, f"{para1}\n\n{para2}"),
     ]
@@ -201,7 +199,9 @@ def test_parent_word_count_within_range():
     sections = []
     for i in range(5):
         sections.append(make_element(ElementType.TITLE, f"# Section {i}"))
-        sections.append(make_element(ElementType.TEXT, f"Content for section {i}. " * 25))
+        sections.append(
+            make_element(ElementType.TEXT, f"Content for section {i}. " * 25)
+        )
     parents, _ = chunker.chunk(sections, {})
 
     text_parents = [p for p in parents if p.type == "text"]
@@ -232,8 +232,8 @@ def test_paragraphs_become_children():
 def test_small_paragraphs_merged():
     """Paragraphs < child_min_words are merged with the next."""
     chunker = ParentChildChunker(child_min_words=50, child_max_words=250)
-    tiny1 = "Short."           # 1 word
-    tiny2 = "Also short."      # 2 words
+    tiny1 = "Short."  # 1 word
+    tiny2 = "Also short."  # 2 words
     normal = "This is a normal paragraph with plenty of words. " * 5  # ~50 words
     elements = [
         make_element(ElementType.TEXT, f"{tiny1}\n\n{tiny2}\n\n{normal}"),
@@ -292,9 +292,13 @@ def test_no_overlap_across_sections():
     chunker = ParentChildChunker(child_min_words=5, child_max_words=250)
     elements = [
         make_element(ElementType.TITLE, "# Section 1"),
-        make_element(ElementType.TEXT, "Content for section one. It has a final sentence."),
+        make_element(
+            ElementType.TEXT, "Content for section one. It has a final sentence."
+        ),
         make_element(ElementType.TITLE, "# Section 2"),
-        make_element(ElementType.TEXT, "Content for section two. It has its own final sentence."),
+        make_element(
+            ElementType.TEXT, "Content for section two. It has its own final sentence."
+        ),
     ]
     _, children = chunker.chunk(elements, {})
 

@@ -37,9 +37,7 @@ async def _fetch_parents(child_results: list, vectorstore) -> list[dict]:
     For each child, return the parent's full content for richer LLM context.
     Atomic chunks (no parent_id) pass through directly.
     """
-    parent_ids = {
-        r["parent_id"] for r in child_results if r.get("parent_id")
-    }
+    parent_ids = {r["parent_id"] for r in child_results if r.get("parent_id")}
 
     parents = {}
     if parent_ids:

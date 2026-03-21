@@ -8,7 +8,6 @@ from backend.app.pipeline.base.embedder import BaseEmbedder
 
 
 class OpenAIEmbedder(BaseEmbedder):
-
     def __init__(self):
         self._client = AsyncOpenAI(api_key=settings.openai_api_key)
         self._model = settings.embedding_model

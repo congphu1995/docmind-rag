@@ -1,5 +1,6 @@
 class DocMindError(Exception):
     """Base exception for all DocMind errors."""
+
     pass
 
 
@@ -9,6 +10,7 @@ class ParserError(DocMindError):
 
 class EncryptedDocumentError(ParserError):
     """Raised when a PDF is password-protected."""
+
     pass
 
 

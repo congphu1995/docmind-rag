@@ -9,7 +9,6 @@ from backend.app.pipeline.base.llm_client import BaseLLMClient
 
 
 class ClaudeClient(BaseLLMClient):
-
     def __init__(self, model: str = "claude-sonnet-4-20250514"):
         self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         self._model = model
@@ -33,9 +32,9 @@ class ClaudeClient(BaseLLMClient):
             temperature=kwargs.get("temperature", 0.1),
         )
         duration = time.perf_counter() - start
-        LLM_REQUEST_DURATION.labels(
-            provider="anthropic", model=self._model
-        ).observe(duration)
+        LLM_REQUEST_DURATION.labels(provider="anthropic", model=self._model).observe(
+            duration
+        )
         if hasattr(response, "usage") and response.usage:
             LLM_TOKENS_TOTAL.labels(
                 provider="anthropic", model=self._model, type="prompt"
@@ -62,6 +61,6 @@ class ClaudeClient(BaseLLMClient):
             async for text in stream.text_stream:
                 yield text
         duration = time.perf_counter() - start
-        LLM_REQUEST_DURATION.labels(
-            provider="anthropic", model=self._model
-        ).observe(duration)
+        LLM_REQUEST_DURATION.labels(provider="anthropic", model=self._model).observe(
+            duration
+        )

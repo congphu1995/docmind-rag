@@ -18,12 +18,12 @@ def ingest_document_task(
     try:
         service = IngestionService()
         result = asyncio.run(
-            service.ingest(file_path, doc_name, language, parser_strategy, user_id=user_id)
+            service.ingest(
+                file_path, doc_name, language, parser_strategy, user_id=user_id
+            )
         )
         return result
     except Exception as e:
-        logger.error(
-            "celery_ingest_failed", task_id=self.request.id, error=str(e)
-        )
+        logger.error("celery_ingest_failed", task_id=self.request.id, error=str(e))
         self.update_state(state="FAILURE", meta={"error": str(e)})
         raise

@@ -36,9 +36,7 @@ def test_from_pymupdf_sets_parser_used():
 
 def test_from_pymupdf_tracks_sections():
     normalizer = ElementNormalizer()
-    pages_data = [
-        {"metadata": {"page": 0}, "text": "# Section A\n\nContent under A."}
-    ]
+    pages_data = [{"metadata": {"page": 0}, "text": "# Section A\n\nContent under A."}]
     elements = normalizer.from_pymupdf(pages_data, "doc1", "test.pdf")
     text_elements = [el for el in elements if el.type == ElementType.TEXT]
     assert all(el.section_title == "Section A" for el in text_elements)

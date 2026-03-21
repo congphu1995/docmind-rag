@@ -13,10 +13,7 @@ from backend.app.pipeline.parsers.normalizer import ElementNormalizer
 
 
 class DoclingParser(BaseParser):
-
-    def __init__(
-        self, enable_ocr: bool = True, enable_table_structure: bool = True
-    ):
+    def __init__(self, enable_ocr: bool = True, enable_table_structure: bool = True):
         self._converter = DocumentConverter()
         self._normalizer = ElementNormalizer()
         self._enable_ocr = enable_ocr

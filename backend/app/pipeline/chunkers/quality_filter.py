@@ -5,7 +5,6 @@ from backend.app.pipeline.base.chunker import Chunk
 
 
 class QualityFilter:
-
     MIN_WORDS = 15
     MIN_ALPHA_RATIO = 0.4
     MAX_NUMERIC_LINE_RATIO = 0.8

@@ -3,6 +3,7 @@ Requires: Elasticsearch + PostgreSQL running (docker compose up elasticsearch po
 Requires: OPENAI_API_KEY set (for embeddings + gpt-4o-mini)
 Run with: pytest tests/integration/test_chat_pipeline.py -m integration
 """
+
 import pytest
 
 from backend.app.schemas.chat import ChatRequest
@@ -31,7 +32,11 @@ async def test_chat_non_streaming(sample_pdf_path):
 
     assert result["answer"] != ""
     assert result["query_type"] in (
-        "factual", "analytical", "general", "multi_hop", "tabular"
+        "factual",
+        "analytical",
+        "general",
+        "multi_hop",
+        "tabular",
     )
 
     # Cleanup

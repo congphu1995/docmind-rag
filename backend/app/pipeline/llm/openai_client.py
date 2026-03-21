@@ -10,7 +10,6 @@ from backend.app.pipeline.base.llm_client import BaseLLMClient
 
 
 class OpenAIClient(BaseLLMClient):
-
     def __init__(self, model: str = "gpt-4o"):
         self._client = AsyncOpenAI(api_key=settings.openai_api_key)
         self._model = model
@@ -99,9 +98,7 @@ class OpenAIClient(BaseLLMClient):
             ).inc(response.usage.completion_tokens)
         return response.choices[0].message.parsed
 
-    def _build_messages(
-        self, messages: list[dict], system: str | None
-    ) -> list[dict]:
+    def _build_messages(self, messages: list[dict], system: str | None) -> list[dict]:
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})

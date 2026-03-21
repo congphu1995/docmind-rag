@@ -21,18 +21,20 @@ def _build_chunk_tree(all_chunks: list[dict]) -> list[dict]:
 
     tree = []
     for parent in parents:
-        tree.append({
-            "chunk_id": parent["chunk_id"],
-            "content_raw": parent.get("content_raw", ""),
-            "content_markdown": parent.get("content_markdown"),
-            "content_html": parent.get("content_html"),
-            "type": parent.get("type", "text"),
-            "page": parent.get("page", 0),
-            "section": parent.get("section", ""),
-            "language": parent.get("language", "en"),
-            "word_count": parent.get("word_count", 0),
-            "children": children_by_parent.get(parent["chunk_id"], []),
-        })
+        tree.append(
+            {
+                "chunk_id": parent["chunk_id"],
+                "content_raw": parent.get("content_raw", ""),
+                "content_markdown": parent.get("content_markdown"),
+                "content_html": parent.get("content_html"),
+                "type": parent.get("type", "text"),
+                "page": parent.get("page", 0),
+                "section": parent.get("section", ""),
+                "language": parent.get("language", "en"),
+                "word_count": parent.get("word_count", 0),
+                "children": children_by_parent.get(parent["chunk_id"], []),
+            }
+        )
 
     # Add orphan children (atomic chunks with no parent)
     parent_ids = {p["chunk_id"] for p in parents}
@@ -40,18 +42,20 @@ def _build_chunk_tree(all_chunks: list[dict]) -> list[dict]:
     for pid in orphan_parent_ids:
         if not pid:
             for child in children_by_parent[pid]:
-                tree.append({
-                    "chunk_id": child["chunk_id"],
-                    "content_raw": child.get("content_raw", ""),
-                    "content_markdown": child.get("content_markdown"),
-                    "content_html": child.get("content_html"),
-                    "type": child.get("type", "text"),
-                    "page": child.get("page", 0),
-                    "section": child.get("section", ""),
-                    "language": child.get("language", "en"),
-                    "word_count": len(child.get("content_raw", "").split()),
-                    "children": [],
-                })
+                tree.append(
+                    {
+                        "chunk_id": child["chunk_id"],
+                        "content_raw": child.get("content_raw", ""),
+                        "content_markdown": child.get("content_markdown"),
+                        "content_html": child.get("content_html"),
+                        "type": child.get("type", "text"),
+                        "page": child.get("page", 0),
+                        "section": child.get("section", ""),
+                        "language": child.get("language", "en"),
+                        "word_count": len(child.get("content_raw", "").split()),
+                        "children": [],
+                    }
+                )
 
     return tree
 
@@ -87,7 +91,8 @@ async def get_document_chunks(
     if search:
         search_lower = search.lower()
         all_chunks = [
-            c for c in all_chunks
+            c
+            for c in all_chunks
             if search_lower in c.get("content_raw", "").lower()
             or search_lower in c.get("content", "").lower()
         ]

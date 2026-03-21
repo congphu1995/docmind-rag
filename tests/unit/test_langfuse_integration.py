@@ -11,7 +11,11 @@ from unittest.mock import patch
 from backend.app.agent.graph import build_graph
 from backend.app.agent.llm import get_chat_model, get_mini_model
 from backend.app.agent.nodes.decomposer import decomposer
-from backend.app.agent.nodes.generator import direct_llm, direct_response, generator_node
+from backend.app.agent.nodes.generator import (
+    direct_llm,
+    direct_response,
+    generator_node,
+)
 from backend.app.agent.nodes.query_analyzer import query_analyzer
 from backend.app.agent.nodes.query_rewriter import query_rewriter
 from backend.app.agent.nodes.retriever import retriever_node
@@ -76,7 +80,9 @@ def test_get_chat_model_returns_langchain_model(mock_settings):
     model = get_chat_model("openai")
     assert hasattr(model, "ainvoke"), "Model must have ainvoke for async usage"
     assert hasattr(model, "astream"), "Model must have astream for streaming"
-    assert hasattr(model, "with_structured_output"), "Model must support structured output"
+    assert hasattr(model, "with_structured_output"), (
+        "Model must support structured output"
+    )
 
 
 @patch("backend.app.agent.llm.settings")

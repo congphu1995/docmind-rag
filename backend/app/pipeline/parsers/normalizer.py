@@ -2,13 +2,13 @@
 Converts raw parser output (varies by parser) → unified ParsedElement list.
 All downstream code only ever sees ParsedElement.
 """
+
 from typing import Optional
 
 from backend.app.pipeline.base.parser import ElementType, ParsedElement
 
 
 class ElementNormalizer:
-
     def from_docling(
         self, docling_result, doc_id: str, doc_name: str
     ) -> list[ParsedElement]:
@@ -154,7 +154,11 @@ class ElementNormalizer:
         label = str(getattr(item, "label", ""))
         if label in ("table", "picture"):
             try:
-                return item.export_to_markdown(doc=doc) if doc else item.export_to_markdown()
+                return (
+                    item.export_to_markdown(doc=doc)
+                    if doc
+                    else item.export_to_markdown()
+                )
             except Exception:
                 pass
         return str(getattr(item, "text", ""))

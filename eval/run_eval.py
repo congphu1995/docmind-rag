@@ -161,9 +161,7 @@ async def run_eval(
             latencies.append(elapsed_ms)
 
             reranked = response.get("reranked_chunks", [])
-            contexts = [
-                c.get("content", "") for c in reranked if c.get("content")
-            ]
+            contexts = [c.get("content", "") for c in reranked if c.get("content")]
 
             results.append(
                 {
@@ -171,9 +169,7 @@ async def run_eval(
                     "ground_truth": q.get("answer", ""),
                     "generated_answer": response.get("answer", ""),
                     "contexts": contexts,
-                    "relevant_found": any(
-                        c.get("score", 0) > 0.5 for c in reranked
-                    ),
+                    "relevant_found": any(c.get("score", 0) > 0.5 for c in reranked),
                     "query_type": response.get("query_type", ""),
                     "hyde_used": response.get("hyde_used", False),
                     "type": q.get("type", ""),
@@ -390,10 +386,12 @@ async def run_custom_eval(sample_size: int):
     print_metrics("Custom Dataset Evaluation", overall_metrics)
     print("\nPer-type breakdown:")
     for qtype, type_metrics in by_type.items():
-        print(f"  {qtype}: hit_rate={type_metrics.get('retrieval_hit_rate', 0):.1%}, "
-              f"faithfulness={type_metrics.get('faithfulness', 0):.4f}, "
-              f"relevancy={type_metrics.get('answer_relevancy', 0):.4f}, "
-              f"recall={type_metrics.get('context_recall', 0):.4f}")
+        print(
+            f"  {qtype}: hit_rate={type_metrics.get('retrieval_hit_rate', 0):.1%}, "
+            f"faithfulness={type_metrics.get('faithfulness', 0):.4f}, "
+            f"relevancy={type_metrics.get('answer_relevancy', 0):.4f}, "
+            f"recall={type_metrics.get('context_recall', 0):.4f}"
+        )
 
     CUSTOM_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     output = {

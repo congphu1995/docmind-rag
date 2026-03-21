@@ -3,6 +3,7 @@ Extract document-level metadata with one LLM call.
 Result stored with every chunk in Qdrant payload.
 Uses structured output — returns a validated Pydantic model.
 """
+
 from backend.app.pipeline.base.llm_client import BaseLLMClient
 from backend.app.pipeline.base.parser import ElementType, ParsedElement
 from backend.app.pipeline.prompts import METADATA_EXTRACTION_PROMPT
@@ -10,7 +11,6 @@ from backend.app.schemas.pipeline import DocumentMetadata
 
 
 class MetadataExtractor:
-
     def __init__(self, llm: BaseLLMClient):
         self._llm = llm
 

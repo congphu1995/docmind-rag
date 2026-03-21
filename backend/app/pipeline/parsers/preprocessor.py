@@ -7,7 +7,6 @@ from backend.app.core.logging import logger
 
 
 class PDFPreprocessor:
-
     def diagnose(self, file_path: str) -> dict:
         """Inspect PDF before parsing. Returns diagnosis dict."""
         doc = fitz.open(file_path)

@@ -2,13 +2,13 @@
 Describes figures/images using GPT-4o Vision.
 Produces a text description suitable for embedding + retrieval.
 """
+
 from backend.app.core.logging import logger
 from backend.app.pipeline.base.llm_client import BaseLLMClient
 from backend.app.pipeline.prompts import FIGURE_DESCRIPTION_PROMPT
 
 
 class FigureDescriber:
-
     def __init__(self, llm: BaseLLMClient):
         self._llm = llm
 

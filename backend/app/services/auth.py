@@ -11,16 +11,11 @@ from backend.app.models.user import User
 
 
 class AuthService:
-
     def hash_password(self, password: str) -> str:
-        return bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, plain: str, hashed: str) -> bool:
-        return bcrypt.checkpw(
-            plain.encode("utf-8"), hashed.encode("utf-8")
-        )
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
     def create_access_token(self, user_id: str, email: str) -> str:
         payload = {
@@ -74,9 +69,7 @@ class AuthService:
 
     async def authenticate(self, email: str, password: str) -> User | None:
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(User).where(User.email == email)
-            )
+            result = await session.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
             if not user or not self.verify_password(password, user.hashed_password):
                 return None
@@ -84,7 +77,5 @@ class AuthService:
 
     async def get_user_by_id(self, user_id: str) -> User | None:
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(User).where(User.id == user_id)
-            )
+            result = await session.execute(select(User).where(User.id == user_id))
             return result.scalar_one_or_none()

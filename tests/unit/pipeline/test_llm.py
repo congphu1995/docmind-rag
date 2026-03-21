@@ -8,6 +8,7 @@ def test_factory_creates_openai():
     with patch("backend.app.pipeline.llm.openai_client.AsyncOpenAI"):
         client = LLMFactory.create("openai")
         from backend.app.pipeline.llm.openai_client import OpenAIClient
+
         assert isinstance(client, OpenAIClient)
 
 
@@ -15,6 +16,7 @@ def test_factory_creates_claude():
     with patch("backend.app.pipeline.llm.claude_client.AsyncAnthropic"):
         client = LLMFactory.create("claude")
         from backend.app.pipeline.llm.claude_client import ClaudeClient
+
         assert isinstance(client, ClaudeClient)
 
 
@@ -54,6 +56,7 @@ async def test_openai_complete():
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         from backend.app.pipeline.llm.openai_client import OpenAIClient
+
         client = OpenAIClient()
         result = await client.complete([{"role": "user", "content": "Hi"}])
         assert result == "Hello!"
@@ -74,6 +77,7 @@ async def test_claude_complete():
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
         from backend.app.pipeline.llm.claude_client import ClaudeClient
+
         client = ClaudeClient()
         result = await client.complete([{"role": "user", "content": "Hi"}])
         assert result == "Hello from Claude!"

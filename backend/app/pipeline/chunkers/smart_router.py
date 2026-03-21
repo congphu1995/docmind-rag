@@ -2,6 +2,7 @@
 Routes each ParsedElement to the correct chunking strategy.
 Entry point for all chunking — nothing calls ParentChildChunker directly.
 """
+
 from __future__ import annotations
 
 from backend.app.core.logging import logger
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
 
 
 class SmartRouter:
-
     def __init__(
         self,
         chunker: ParentChildChunker = None,
@@ -94,9 +94,7 @@ class SmartRouter:
 
         return elements
 
-    def _group_list_items(
-        self, elements: list[ParsedElement]
-    ) -> list[ParsedElement]:
+    def _group_list_items(self, elements: list[ParsedElement]) -> list[ParsedElement]:
         """Merge consecutive list items into one TEXT element."""
         result = []
         list_buffer: list[ParsedElement] = []
@@ -116,9 +114,7 @@ class SmartRouter:
 
         return result
 
-    def _merge_list_items(
-        self, items: list[ParsedElement]
-    ) -> ParsedElement:
+    def _merge_list_items(self, items: list[ParsedElement]) -> ParsedElement:
         merged_content = "\n".join(f"• {el.content.strip()}" for el in items)
         first = items[0]
         return ParsedElement(

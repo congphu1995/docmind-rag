@@ -34,8 +34,18 @@ def _make_state(chunks: list = None, llm_preference: str = "openai") -> dict:
 
 def test_build_context_formats_sources():
     chunks = [
-        {"content": "Revenue was $10M", "doc_name": "report.pdf", "page": 5, "section": "Financials"},
-        {"content": "Q2 grew 15%", "doc_name": "report.pdf", "page": 8, "section": "Growth"},
+        {
+            "content": "Revenue was $10M",
+            "doc_name": "report.pdf",
+            "page": 5,
+            "section": "Financials",
+        },
+        {
+            "content": "Q2 grew 15%",
+            "doc_name": "report.pdf",
+            "page": 8,
+            "section": "Growth",
+        },
     ]
     context = _build_context(chunks)
     assert "[Source 1]" in context
@@ -50,8 +60,22 @@ def test_build_context_empty():
 def test_extract_citations():
     answer = "Revenue was $10M [Source 1]. Growth was 15% [Source 2]."
     chunks = [
-        {"doc_name": "a.pdf", "page": 1, "section": "A", "content": "Rev", "score": 0.9, "chunk_id": "c1"},
-        {"doc_name": "b.pdf", "page": 2, "section": "B", "content": "Growth", "score": 0.8, "chunk_id": "c2"},
+        {
+            "doc_name": "a.pdf",
+            "page": 1,
+            "section": "A",
+            "content": "Rev",
+            "score": 0.9,
+            "chunk_id": "c1",
+        },
+        {
+            "doc_name": "b.pdf",
+            "page": 2,
+            "section": "B",
+            "content": "Growth",
+            "score": 0.8,
+            "chunk_id": "c2",
+        },
     ]
     citations = _extract_citations(answer, chunks)
     assert len(citations) == 2
@@ -89,8 +113,14 @@ async def test_generator_produces_answer(mock_get_chat):
     )
 
     chunks = [
-        {"content": "Revenue was $10M", "doc_name": "report.pdf", "page": 5,
-         "section": "Financials", "score": 0.9, "chunk_id": "c1"},
+        {
+            "content": "Revenue was $10M",
+            "doc_name": "report.pdf",
+            "page": 5,
+            "section": "Financials",
+            "score": 0.9,
+            "chunk_id": "c1",
+        },
     ]
     state = _make_state(chunks=chunks)
     result = await generator_node(state)

@@ -133,7 +133,11 @@ def test_load_custom_manifest():
     manifest = {
         "user_id": "user-123",
         "documents": [
-            {"paper_id": "attention-is-all-you-need", "doc_id": "d1", "filename": "att.pdf"},
+            {
+                "paper_id": "attention-is-all-you-need",
+                "doc_id": "d1",
+                "filename": "att.pdf",
+            },
             {"paper_id": "bert", "doc_id": "d2", "filename": "bert.pdf"},
         ],
     }

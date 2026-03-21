@@ -8,5 +8,4 @@ class BaseReranker(ABC):
         query: str,
         chunks: list[dict],
         top_n: int,
-    ) -> list[dict]:
-        ...
+    ) -> list[dict]: ...

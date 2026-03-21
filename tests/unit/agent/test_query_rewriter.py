@@ -60,9 +60,7 @@ async def test_rewriter_with_hyde(mock_get_mini):
         ]
     )
 
-    state = _make_state(
-        "How does the revenue compare between Q1 and Q2?", "analytical"
-    )
+    state = _make_state("How does the revenue compare between Q1 and Q2?", "analytical")
     result = await query_rewriter(state)
 
     assert result["hyde_used"] is True
@@ -77,9 +75,7 @@ async def test_rewriter_without_hyde(mock_get_mini):
 
     mock_bound = AsyncMock()
     mock_llm.bind.return_value = mock_bound
-    mock_bound.ainvoke = AsyncMock(
-        return_value=MagicMock(content="revenue Q1")
-    )
+    mock_bound.ainvoke = AsyncMock(return_value=MagicMock(content="revenue Q1"))
 
     state = _make_state("Revenue Q1", "factual")
     result = await query_rewriter(state)

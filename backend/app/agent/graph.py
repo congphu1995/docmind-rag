@@ -8,10 +8,15 @@ Flow:
     ├── general → direct_llm → END
     └── greeting → direct_response → END
 """
+
 from langgraph.graph import END, StateGraph
 
 from backend.app.agent.nodes.decomposer import decomposer
-from backend.app.agent.nodes.generator import direct_llm, direct_response, generator_node
+from backend.app.agent.nodes.generator import (
+    direct_llm,
+    direct_response,
+    generator_node,
+)
 from backend.app.agent.nodes.query_analyzer import query_analyzer
 from backend.app.agent.nodes.query_rewriter import query_rewriter
 from backend.app.agent.nodes.reranker import reranker_node

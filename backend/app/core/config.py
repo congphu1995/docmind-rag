@@ -20,13 +20,13 @@ class Settings(BaseSettings):
     parser_strategy: Literal["docling", "pymupdf", "auto"] = "auto"
 
     # Chunker (word counts)
-    parent_chunk_size: int = 800      # target when splitting oversized sections
-    parent_min_words: int = 200       # merge small sections below this
-    parent_max_words: int = 1200      # split sections above this
-    child_chunk_size: int = 150       # target when splitting oversized paragraphs
-    child_min_words: int = 50         # merge small paragraphs below this
-    child_max_words: int = 250        # split paragraphs above this
-    chunk_overlap: int = 15           # kept for backward compat, unused by new chunker
+    parent_chunk_size: int = 800  # target when splitting oversized sections
+    parent_min_words: int = 200  # merge small sections below this
+    parent_max_words: int = 1200  # split sections above this
+    child_chunk_size: int = 150  # target when splitting oversized paragraphs
+    child_min_words: int = 50  # merge small paragraphs below this
+    child_max_words: int = 250  # split paragraphs above this
+    chunk_overlap: int = 15  # kept for backward compat, unused by new chunker
 
     # Retrieval
     retrieval_top_k: int = 20

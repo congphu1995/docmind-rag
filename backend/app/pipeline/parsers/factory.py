@@ -8,7 +8,6 @@ from backend.app.pipeline.parsers.pymupdf_parser import PyMuPDFParser
 
 
 class ParserFactory:
-
     @staticmethod
     def create(strategy: str = None) -> BaseParser:
         """Create parser by explicit strategy name."""

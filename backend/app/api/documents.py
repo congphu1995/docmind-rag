@@ -30,7 +30,9 @@ async def upload_document(
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size: 50MB")
+        raise HTTPException(
+            status_code=413, detail="File too large. Maximum size: 50MB"
+        )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)

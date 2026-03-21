@@ -47,18 +47,32 @@ def test_assess_quality_empty():
 @patch("backend.app.agent.nodes.retriever._fetch_parents")
 @patch("backend.app.agent.nodes.retriever.VectorStoreFactory")
 @patch("backend.app.agent.nodes.retriever.OpenAIEmbedder")
-async def test_retriever_uses_hyde_query(mock_embedder_cls, mock_factory_cls, mock_fetch):
+async def test_retriever_uses_hyde_query(
+    mock_embedder_cls, mock_factory_cls, mock_fetch
+):
     mock_embedder = AsyncMock()
     mock_embedder_cls.return_value = mock_embedder
     mock_embedder.embed_single = AsyncMock(return_value=[0.1] * 1536)
 
     mock_store = AsyncMock()
     mock_factory_cls.create.return_value = mock_store
-    mock_store.search = AsyncMock(return_value=[
-        {"score": 0.9, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
-         "content_raw": "text", "doc_name": "test.pdf", "type": "text",
-         "page": 1, "section": "s1", "language": "en", "word_count": 50}
-    ])
+    mock_store.search = AsyncMock(
+        return_value=[
+            {
+                "score": 0.9,
+                "parent_id": "p1",
+                "doc_id": "d1",
+                "chunk_id": "c1",
+                "content_raw": "text",
+                "doc_name": "test.pdf",
+                "type": "text",
+                "page": 1,
+                "section": "s1",
+                "language": "en",
+                "word_count": 50,
+            }
+        ]
+    )
 
     mock_fetch.return_value = [{"content": "result", "score": 0.9, "chunk_id": "c1"}]
 
@@ -72,21 +86,49 @@ async def test_retriever_uses_hyde_query(mock_embedder_cls, mock_factory_cls, mo
 @patch("backend.app.agent.nodes.retriever._fetch_parents")
 @patch("backend.app.agent.nodes.retriever.VectorStoreFactory")
 @patch("backend.app.agent.nodes.retriever.OpenAIEmbedder")
-async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_factory_cls, mock_fetch):
+async def test_retriever_retries_on_low_quality(
+    mock_embedder_cls, mock_factory_cls, mock_fetch
+):
     mock_embedder = AsyncMock()
     mock_embedder_cls.return_value = mock_embedder
     mock_embedder.embed_single = AsyncMock(return_value=[0.1] * 1536)
 
     mock_store = AsyncMock()
     mock_factory_cls.create.return_value = mock_store
-    mock_store.search = AsyncMock(side_effect=[
-        [{"score": 0.3, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
-          "content_raw": "text", "doc_name": "test.pdf", "type": "text",
-          "page": 1, "section": "s1", "language": "en", "word_count": 50}],
-        [{"score": 0.85, "parent_id": "p1", "doc_id": "d1", "chunk_id": "c1",
-          "content_raw": "text", "doc_name": "test.pdf", "type": "text",
-          "page": 1, "section": "s1", "language": "en", "word_count": 50}],
-    ])
+    mock_store.search = AsyncMock(
+        side_effect=[
+            [
+                {
+                    "score": 0.3,
+                    "parent_id": "p1",
+                    "doc_id": "d1",
+                    "chunk_id": "c1",
+                    "content_raw": "text",
+                    "doc_name": "test.pdf",
+                    "type": "text",
+                    "page": 1,
+                    "section": "s1",
+                    "language": "en",
+                    "word_count": 50,
+                }
+            ],
+            [
+                {
+                    "score": 0.85,
+                    "parent_id": "p1",
+                    "doc_id": "d1",
+                    "chunk_id": "c1",
+                    "content_raw": "text",
+                    "doc_name": "test.pdf",
+                    "type": "text",
+                    "page": 1,
+                    "section": "s1",
+                    "language": "en",
+                    "word_count": 50,
+                }
+            ],
+        ]
+    )
 
     mock_fetch.return_value = [{"content": "result", "score": 0.85, "chunk_id": "c1"}]
 
@@ -95,9 +137,7 @@ async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_factory_
         mock_get_mini.return_value = mock_llm
         mock_bound = AsyncMock()
         mock_llm.bind.return_value = mock_bound
-        mock_bound.ainvoke = AsyncMock(
-            return_value=MagicMock(content="expanded query")
-        )
+        mock_bound.ainvoke = AsyncMock(return_value=MagicMock(content="expanded query"))
 
         state = _make_state()
         result = await retriever_node(state)

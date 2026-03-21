@@ -2,6 +2,7 @@
 Prepend situating context to each child chunk before embedding.
 Anthropic technique — +15-20% retrieval precision at one-time index cost.
 """
+
 import asyncio
 
 from backend.app.core.logging import logger
@@ -11,7 +12,6 @@ from backend.app.pipeline.prompts import ENRICHMENT_PROMPT
 
 
 class ContextEnricher:
-
     def __init__(self, llm: BaseLLMClient):
         self._llm = llm
 

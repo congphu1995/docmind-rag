@@ -4,6 +4,7 @@ Creates 3 representations of a table:
 - markdown: for LLM context (easier to reason about structure)
 - html: for UI rendering (original fidelity)
 """
+
 import re
 from dataclasses import dataclass
 
@@ -20,7 +21,6 @@ class TableRepresentations:
 
 
 class TableRepresenter:
-
     def __init__(self, llm: BaseLLMClient):
         self._llm = llm
 
@@ -49,9 +49,7 @@ class TableRepresenter:
             html=table_html,
         )
 
-    async def _generate_nl(
-        self, table_markdown: str, section_context: str
-    ) -> str:
+    async def _generate_nl(self, table_markdown: str, section_context: str) -> str:
         """Use LLM to convert table to natural language description."""
         prompt = TABLE_NL_PROMPT.format(
             table=table_markdown,
@@ -73,9 +71,7 @@ class TableRepresenter:
 
         table_data = []
         for row in rows:
-            cells = re.findall(
-                r"<(?:td|th)[^>]*>(.*?)</(?:td|th)>", row, re.DOTALL
-            )
+            cells = re.findall(r"<(?:td|th)[^>]*>(.*?)</(?:td|th)>", row, re.DOTALL)
             cells = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
             table_data.append(cells)
 

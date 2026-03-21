@@ -2,6 +2,7 @@
 Orchestrates the full ingestion pipeline:
 preprocess → parse → normalize → extract_metadata → chunk → enrich → filter → embed → store
 """
+
 import os
 import time
 import uuid
@@ -29,7 +30,6 @@ from backend.app.vectorstore.factory import VectorStoreFactory
 
 
 class IngestionService:
-
     def __init__(self):
         mini_llm = LLMFactory.create_mini()
         vision_llm = LLMFactory.create("openai", model="gpt-4o")
@@ -75,9 +75,7 @@ class IngestionService:
             else:
                 parser = ParserFactory.create(parser_strategy)
 
-            elements = await parser.parse(
-                clean_path, doc_id=doc_id, doc_name=doc_name
-            )
+            elements = await parser.parse(clean_path, doc_id=doc_id, doc_name=doc_name)
             INGESTION_STAGE_DURATION.labels(stage="parse").observe(
                 time.perf_counter() - start
             )
@@ -228,7 +226,5 @@ class IngestionService:
         async with AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
-            await session.execute(
-                delete(Document).where(Document.doc_id == doc_id)
-            )
+            await session.execute(delete(Document).where(Document.doc_id == doc_id))
             await session.commit()

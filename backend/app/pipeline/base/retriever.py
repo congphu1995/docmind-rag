@@ -9,5 +9,4 @@ class BaseRetriever(ABC):
         query_vector: list[float],
         top_k: int,
         filters: Optional[dict] = None,
-    ) -> list[dict]:
-        ...
+    ) -> list[dict]: ...
