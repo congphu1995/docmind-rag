@@ -3,7 +3,7 @@
 Seed custom eval documents (ML/AI papers from arXiv).
 Downloads PDFs and ingests them via IngestionService.
 Usage: uv run python scripts/seed_custom_eval.py
-Requires: Docker services running (qdrant, postgres, redis)
+Requires: Docker services running (elasticsearch, postgres, redis)
 """
 
 import asyncio

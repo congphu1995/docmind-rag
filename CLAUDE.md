@@ -25,7 +25,7 @@ pytest tests/unit/pipeline/test_chunkers.py::test_parent_word_count -v  # Single
 pytest tests/integration -m integration  # Integration (requires Docker services)
 
 # Infrastructure
-docker compose up -d                 # Start Qdrant, PostgreSQL, Redis
+docker compose up -d                 # Start Elasticsearch, PostgreSQL, Redis
 
 # Linting
 ruff check .
@@ -35,7 +35,7 @@ mypy backend/
 
 ## Architecture
 
-**DocMind RAG** — Upload documents → parse → chunk → embed → store in Qdrant + PostgreSQL for retrieval-augmented generation.
+**DocMind RAG** — Upload documents → parse → chunk → embed → store in Elasticsearch + PostgreSQL for retrieval-augmented generation.
 
 ### Pipeline Flow (IngestionService)
 
@@ -43,7 +43,7 @@ mypy backend/
 PDF/DOCX → PDFPreprocessor (deskew) → ParserFactory.auto_select() → ElementNormalizer
   → MetadataExtractor (LLM) → SmartRouter → ParentChildChunker
   → ContextEnricher (LLM) → QualityFilter → OpenAIEmbedder
-  → Qdrant (child vectors) + PostgreSQL (parent chunks + metadata)
+  → Elasticsearch (child vectors + BM25 + parent chunks) + PostgreSQL (document metadata)
 ```
 
 ### Strategy Pattern — All Components Behind ABCs
@@ -58,7 +58,7 @@ PDF/DOCX → PDFPreprocessor (deskew) → ParserFactory.auto_select() → Elemen
 
 **Parents** are section-based (one heading = one parent). Sections < 200 words are merged, > 1200 words split at paragraph boundaries. Target ~800 words. Stored in PostgreSQL.
 
-**Children** are paragraph-based within each parent. Paragraphs < 50 words are merged, > 250 words split at sentence boundaries (via `SentenceSplitter`). Target ~150 words. Embedded in Qdrant.
+**Children** are paragraph-based within each parent. Paragraphs < 50 words are merged, > 250 words split at sentence boundaries (via `SentenceSplitter`). Target ~150 words. Embedded in Elasticsearch.
 
 Atomic elements (tables, figures, code) are never split. Titles mark section boundaries. Sentence-based overlap between parent groups.
 
@@ -71,7 +71,7 @@ Atomic elements (tables, figures, code) are never split. Titles mark section bou
 - `backend/app/pipeline/rerankers/` — IdentityReranker, CohereReranker, RerankerFactory
 - `backend/app/services/` — `auth.py` (JWT + bcrypt), `ingestion.py` (9-stage pipeline), `rag.py`
 - `backend/app/workers/` — Celery app + async ingest task
-- `backend/app/vectorstore/qdrant_client.py` — QdrantWrapper (upsert, search, delete, filtering)
+- `backend/app/vectorstore/elasticsearch_store.py` — ElasticsearchStore (hybrid search, RRF, upsert, delete)
 - `backend/app/models/` — `document.py` (Document + ParentChunk), `user.py` (User with bcrypt)
 
 ### Async Everywhere
@@ -92,4 +92,4 @@ Exposed at `GET /metrics/`. Custom metrics: `http_request_duration_seconds`, `ll
 
 ### Docker Services
 
-PostgreSQL on 5432 (user/pass/db: docmind), Qdrant on 6333, Redis on 6379, Prometheus on 9090, Grafana on 3002.
+PostgreSQL on 5432 (user/pass/db: docmind), Elasticsearch on 9200, Redis on 6379, Prometheus on 9090, Grafana on 3002.

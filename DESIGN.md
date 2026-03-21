@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Author | Cong Phu Nguyen — Senior AI Engineer |
-| Stack | FastAPI · LangGraph · Docling · Qdrant · React |
+| Stack | FastAPI · LangGraph · Docling · Elasticsearch · React |
 | Purpose | Portfolio project demonstrating production RAG architecture |
 
 ---
@@ -51,7 +51,7 @@
 Parser:    DoclingParser, PyMuPDFParser, PDFPreprocessor, ElementNormalizer
 Chunker:   SmartRouter, ParentChildChunker, ContextEnricher, QualityFilter
 Agent:     query_analyzer, router, retriever (adaptive), generator, conditional HyDE
-Infra:     Qdrant, PostgreSQL (parent chunks), Docker Compose
+Infra:     Elasticsearch, PostgreSQL (parent chunks), Docker Compose
 Eval:      RAGAS, FinanceBench, committed results JSON
 Frontend:  Chat UI (streaming + citations + LLM toggle + agent trace), Upload zone
 ```
@@ -96,7 +96,7 @@ Redis query cache             add after basic pipeline works
                            │ Infrastructure clients
 ┌──────────────────────────▼───────────────────────────────────┐
 │  INFRASTRUCTURE LAYER                                        │
-│  Qdrant · PostgreSQL · MinIO · Celery · Langfuse             │
+│  Elasticsearch · PostgreSQL · MinIO · Celery · Langfuse      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,14 +134,14 @@ Raw File (PDF / DOCX / TXT)
 ┌───────────────────┐
 │  5. Chunk         │  SmartRouter decides per element type (see section 3.3)
 │  SmartRouter      │  Parent chunks (800 words) → PostgreSQL
-│  ParentChildChunker  Child chunks  (150 words) → Qdrant (embedded)
+│  ParentChildChunker  Child chunks  (150 words) → Elasticsearch (embedded)
 └────────┬──────────┘
          │
          ▼
 ┌───────────────────┐
 │  6. Filter+Index  │  QualityFilter removes noise before embedding
 │  QualityFilter    │  OpenAIEmbedder embeds child chunks
-│  Embedder         │  Qdrant: vectors + full metadata payload
+│  Embedder         │  Elasticsearch: vectors + BM25 + full metadata payload
 │  VectorStoreClient│  PostgreSQL: parent chunks keyed by parent_id
 └───────────────────┘
 ```
@@ -178,7 +178,7 @@ User Query
     │                                                 │
     ▼                                                 │
 [retriever]◄──── retry loop (max 3 attempts) ────┐   │
-  · Dense search top-20 in Qdrant                 │   │
+  · Hybrid search top-20 in Elasticsearch (BM25 + dense via RRF) │   │
   · Metadata filter by doc_ids / language         │   │
   · Assess quality score                          │   │
   · Attempt 1: raw/hyde query                     │   │
@@ -287,7 +287,7 @@ Parents: section-based (one heading = one parent)
 
 Children: paragraph-based within each parent
   Merge paragraphs < 50 words. Split paragraphs > 250 words at sentence boundaries.
-  Target ~150 words. Embedded and stored in Qdrant.
+  Target ~150 words. Embedded and stored in Elasticsearch.
 
 Sentence-based overlap between parent groups (last sentence of previous child).
 ```
@@ -321,13 +321,13 @@ Parent chunk (~800 words) — stored in PostgreSQL
   One full document section with all context.
   What gets sent to the LLM.
 
-  ├── Child A (paragraph 1, ~120 words) — stored in Qdrant (embedded)
-  ├── Child B (paragraphs 2-3 merged, ~90 words) — stored in Qdrant
-  └── Child C (paragraph 4, ~180 words) — stored in Qdrant
+  ├── Child A (paragraph 1, ~120 words) — stored in Elasticsearch (embedded)
+  ├── Child B (paragraphs 2-3 merged, ~90 words) — stored in Elasticsearch
+  └── Child C (paragraph 4, ~180 words) — stored in Elasticsearch
         Natural paragraph boundaries. Preserves document structure.
 
 Query time:
-  1. Embed query → search Qdrant → Child B scores highest
+  1. Embed query → hybrid search Elasticsearch (BM25 + dense via RRF) → Child B scores highest
   2. Look up Child B's parent_id → fetch parent from PostgreSQL
   3. Send PARENT (full ~800 words) to LLM, not just the child
 
@@ -499,7 +499,7 @@ class ParsedElement:
 
 
 # ── Chunk ─────────────────────────────────────────────────────
-# Children → Qdrant (embedded, for retrieval)
+# Children → Elasticsearch (embedded + BM25, for retrieval)
 # Parents  → PostgreSQL (full context, returned to LLM)
 
 @dataclass
@@ -573,7 +573,7 @@ class RAGAgentState(TypedDict):
 | `POST /api/v1/chat/` | JSON | `question, llm?, doc_ids?, history?, stream?` | SSE stream |
 | `POST /api/v1/eval/run` | JSON | `dataset, sample_size?, config?` | `{ run_id }` async |
 | `GET /api/v1/eval/results/{run_id}` | — | — | `{ metrics: {...} }` |
-| `GET /api/v1/health` | — | — | `{ status, qdrant, postgres }` |
+| `GET /api/v1/health` | — | — | `{ status, elasticsearch, postgres }` |
 | `GET /metrics/` | — | — | Prometheus metrics (text) |
 
 **SSE stream format:**
@@ -703,7 +703,7 @@ docmind-rag/
 │       │       └── generator.py          ← streaming + citations
 │       │
 │       ├── vectorstore/
-│       │   ├── qdrant_client.py    ← retry, batching, error handling
+│       │   ├── elasticsearch_store.py ← retry, batching, error handling
 │       │   └── collections.py      ← schema + index management
 │       │
 │       └── workers/
@@ -768,7 +768,7 @@ docmind-rag/
 
 | Service | Technology | Purpose | Port |
 |---|---|---|---|
-| Vector DB | Qdrant v1.9 | Child chunk vectors + metadata + filtered search | 6333 |
+| Vector DB | Elasticsearch 8.15 | Child chunk vectors + BM25 + hybrid search (RRF) | 9200 |
 | Relational DB | PostgreSQL 16 | Parent chunks, document metadata, eval results | 5432 |
 | Object Storage | MinIO | Raw uploaded files — S3-compatible | 9000 |
 | Task Queue | Celery + Redis | Async ingestion — no HTTP timeout on large files | — |
@@ -785,7 +785,7 @@ Redis included as Celery broker. Query cache is roadmap.
 # docker compose up --build
 # All services use TZ=Asia/Ho_Chi_Minh (set via env, no code changes)
 services:
-  qdrant       # :6333
+  elasticsearch # :9200
   postgres     # :5432  (TZ + PGTZ = Asia/Ho_Chi_Minh)
   redis        # :6379  Celery broker
   minio        # :9000
@@ -876,7 +876,7 @@ Reproduce: eval/notebooks/01_baseline_eval.ipynb
 | **Multimodal** | `FigureDescriber` (GPT-4o Vision), `TableRepresenter` (NL + markdown + HTML) |
 | **Eval** | RAGAS + `EvalService` + FinanceBench dataset |
 | **Frontend** | React Chat UI (streaming + citations + LLM toggle + agent trace), Document Manager, Upload Zone, Chunk Viewer |
-| **Infra** | Qdrant, PostgreSQL, Redis/Celery, MinIO, Langfuse, Prometheus + Grafana, Docker Compose |
+| **Infra** | Elasticsearch, PostgreSQL, Redis/Celery, MinIO, Langfuse, Prometheus + Grafana, Docker Compose |
 | **Auth** | JWT authentication (access + refresh tokens) |
 
 ### Roadmap
@@ -903,11 +903,11 @@ Every decision during implementation should map to one of these.
 | **Fail Loud at Config** | Pydantic Settings validates at startup — missing key crashes immediately | Silent `None` causing confusing runtime errors |
 | **Schema First** | `ParsedElement` + `Chunk` defined before any implementation | Each parser returning a different dict structure |
 | **Observable by Default** | Every stage emits structured log with `trace_id` | Debugging with `print()` |
-| **Test at the Seam** | Unit tests against ABCs. Integration tests against real Qdrant. | Tests tightly coupled to concrete implementations |
-| **Async All the Way** | Every I/O is async: DB, Qdrant, LLM, file reads | Sync calls blocking FastAPI event loop |
+| **Test at the Seam** | Unit tests against ABCs. Integration tests against real Elasticsearch. | Tests tightly coupled to concrete implementations |
+| **Async All the Way** | Every I/O is async: DB, Elasticsearch, LLM, file reads | Sync calls blocking FastAPI event loop |
 | **Prompts as Config** | All prompts in `pipeline/prompts.py` + `agent/prompts.py`, versioned with rationale | Inline strings inside node logic |
 | **Structured Output** | LLM responses parsed via Pydantic models (`client.beta.chat.completions.parse`) | Manual `json.loads()` with try/except |
-| **No Layer Skipping** | API → Service → Pipeline only. Never API → Pipeline direct. | Route handlers calling Qdrant directly |
+| **No Layer Skipping** | API → Service → Pipeline only. Never API → Pipeline direct. | Route handlers calling Elasticsearch directly |
 | **Decide Late** | HyDE, reranking are conditional — decided at runtime not hardcoded | Paying latency cost on every query unnecessarily |
 
 ---

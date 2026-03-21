@@ -3,7 +3,7 @@
 Seed FinanceBench documents for evaluation.
 Creates a system eval user, downloads 5 10-K PDFs, ingests them.
 Usage: uv run python scripts/seed_demo_data.py
-Requires: Docker services running (qdrant, postgres, redis)
+Requires: Docker services running (elasticsearch, postgres, redis)
 """
 
 import asyncio
