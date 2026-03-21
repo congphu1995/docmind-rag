@@ -15,12 +15,65 @@
 
 ---
 
+## 0. Chunk Dataclass Changes
+
+Before implementing the vector store, the `Chunk` dataclass (`backend/app/pipeline/base/chunker.py`) needs two changes:
+
+### 0.1 Add `user_id` field
+
+Currently `user_id` is only set on the PostgreSQL `ParentChunk` ORM object during ingestion, bypassing the `Chunk` dataclass. With ES replacing PostgreSQL for parent storage, `user_id` must live on the `Chunk` itself so `upsert_chunks()` can include it.
+
+```python
+@dataclass
+class Chunk:
+    # ... existing fields ...
+    user_id: str = ""          # NEW — set during ingestion, required for per-user filtering
+```
+
+The ingestion service sets `user_id` on all chunks (parents and children) before calling `vectorstore.upsert_chunks()`.
+
+### 0.2 Rename `qdrant_payload()` to `to_document()`
+
+The current `qdrant_payload()` method is Qdrant-specific and omits fields needed by ES (`content_html`, `is_parent`, `user_id`, `created_at`). Rename to a generic serialization method:
+
+```python
+def to_document(self) -> dict:
+    """Serialize chunk to a dict suitable for any vector store."""
+    doc = {
+        "chunk_id": self.chunk_id,
+        "parent_id": self.parent_id,
+        "doc_id": self.doc_id,
+        "doc_name": self.doc_name,
+        "user_id": self.user_id,
+        "content_raw": self.content_raw,
+        "content_markdown": self.content_markdown,
+        "content_html": self.content_html,
+        "type": self.type,
+        "page": self.page,
+        "section": self.section,
+        "language": self.language,
+        "word_count": self.word_count,
+        "is_parent": self.is_parent,
+        "created_at": datetime.utcnow().isoformat(),
+        **self.metadata,
+    }
+    return doc
+```
+
+Note: `content_html` was previously only stored on PostgreSQL parents. Now both parents and children include it in ES (new capability, not just migration).
+
+---
+
 ## 1. ES Index Schema
 
 Single index `docmind_chunks` stores both parents and children.
 
 ```json
 {
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
   "mappings": {
     "properties": {
       "chunk_id":         { "type": "keyword" },
@@ -125,20 +178,25 @@ Two separate queries merged in Python. Guaranteed compatible with ES free Basic 
 
 ```python
 async def search(self, query_vector, query_text, top_k, filters, score_threshold):
+    # Fetch larger candidate set for better RRF fusion
+    candidate_k = top_k * 3
+
     # 1. BM25 query on content_raw (children only)
-    bm25_results = await self._bm25_search(query_text, top_k, filters)
+    bm25_results = await self._bm25_search(query_text, candidate_k, filters)
 
     # 2. kNN query on embedding (children only)
-    knn_results = await self._knn_search(query_vector, top_k, filters)
+    knn_results = await self._knn_search(query_vector, candidate_k, filters)
 
     # 3. Merge with RRF
     merged = self._rrf_merge(bm25_results, knn_results, k=60)
 
-    # 4. Apply score threshold, return top_k
+    # 4. Return top_k (score_threshold not applied — see note below)
     return merged[:top_k]
 ```
 
 Both queries filter to `is_parent: false` plus user-provided filters (doc_ids, language, type, user_id).
+
+**Note on `score_threshold`:** The `score_threshold` parameter is accepted for interface compatibility but **not applied** by `ElasticsearchStore`. RRF scores are on a completely different scale than cosine similarity (typically 0.0-0.03 vs 0.0-1.0). The existing threshold of 0.4 is meaningless for RRF. Quality assessment in the `AdaptiveRetriever` continues to work because it uses the top-5 average of whatever scores are returned, which adapts naturally to any scale.
 
 ### 3.2 RRF Merge
 
@@ -160,17 +218,53 @@ def _rrf_merge(self, bm25_results, knn_results, k=60):
     return [{"score": score, **docs[cid]} for cid, score in ranked]
 ```
 
-### 3.3 Other Methods
+### 3.3 Return Schema from `search()`
 
-- **`upsert_chunks()`** — ES `_bulk` API. Children include `embedding` field, parents don't.
+All results from `search()` are dicts with this shape (used by `AdaptiveRetriever` for quality assessment and parent expansion):
+
+```python
+{
+    "score": float,          # RRF score (NOT cosine — different scale)
+    "chunk_id": str,
+    "parent_id": str | None,
+    "doc_id": str,
+    "doc_name": str,
+    "content_raw": str,
+    "type": str,
+    "page": int,
+    "section": str,
+    "language": str,
+    "word_count": int,
+    **metadata
+}
+```
+
+The retriever's `_assess_quality()` currently accesses `r.score` (attribute on Qdrant `ScoredPoint`). This must change to `r["score"]` (dict access). Similarly, `_fetch_parents()` accesses `r.payload.get("parent_id")` which becomes `r["parent_id"]`.
+
+### 3.4 Other Methods
+
+- **`upsert_chunks()`** — ES `_bulk` API. Batch size: 100 (configurable via `es_bulk_batch_size` setting). Children include `embedding` field, parents don't. Serializes chunks via `chunk.to_document()`.
 - **`fetch_parents()`** — `terms` query on `chunk_id` where `is_parent: true`.
 - **`delete_by_doc_id()`** — `delete_by_query` with `doc_id` filter.
 - **`get_by_doc_id()`** — `search` with `doc_id` filter, no scoring, returns all parents + children.
-- **`initialize()`** — Create index with mapping from Section 1 if it doesn't exist.
+- **`initialize()`** — Create index with mapping + settings from Section 1 if it doesn't exist.
 
-### 3.4 Client
+### 3.5 Error Handling
+
+All ES operations wrap exceptions in the existing `VectorStoreError` (from `backend/app/core/exceptions.py`). Common cases:
+- Connection refused → `VectorStoreError("Elasticsearch unavailable")`
+- Index not found → auto-create via `initialize()`, retry
+- Bulk partial failure → log failed items, raise `VectorStoreError` with count
+
+### 3.6 Client
 
 Uses `elasticsearch[async]` — the official async Python client (`AsyncElasticsearch`).
+
+Config includes optional auth for production:
+```python
+elasticsearch_username: str = ""    # empty = no auth (dev)
+elasticsearch_password: str = ""
+```
 
 ---
 
@@ -182,7 +276,10 @@ Uses `elasticsearch[async]` — the official async Python client (`AsyncElastics
 vectorstore_strategy: str = "elasticsearch"
 elasticsearch_url: str = "http://localhost:9200"
 elasticsearch_index: str = "docmind_chunks"
+elasticsearch_username: str = ""
+elasticsearch_password: str = ""
 rrf_k: int = 60
+es_bulk_batch_size: int = 100
 ```
 
 Existing Qdrant settings kept (not breaking), just unused when strategy is `elasticsearch`.
@@ -202,15 +299,20 @@ class VectorStoreFactory:
 ### 4.3 Ingestion Service (`backend/app/services/ingestion.py`)
 
 Current stages 8-9 (Qdrant upsert + PostgreSQL parent insert) collapse:
+- Set `user_id` on all chunks before storing
 - `vectorstore.upsert_chunks(parents)` — no vectors
 - `vectorstore.upsert_chunks(children, vectors)` — with vectors
 - Remove direct `ParentChunk` ORM inserts
+
+**`delete_document()`** also needs updating: currently deletes from both Qdrant and PostgreSQL (`ParentChunk`). After migration, call `vectorstore.delete_by_doc_id()` (deletes both parents and children from ES) plus the existing PostgreSQL `Document` record deletion.
 
 ### 4.4 Retriever Node (`backend/app/agent/nodes/retriever.py`)
 
 - `QdrantWrapper.search(vector, ...)` becomes `vectorstore.search(vector, query_text, ...)`
 - PostgreSQL parent query becomes `vectorstore.fetch_parents(parent_ids)`
 - `query_text` comes from agent state `rewritten_query`
+- `_assess_quality()` changes from `r.score` (attribute) to `r["score"]` (dict access)
+- `_fetch_parents()` changes from `r.payload.get("parent_id")` to `r["parent_id"]`
 
 ### 4.5 Chunk Viewer API (`backend/app/api/chunks.py`)
 
@@ -239,9 +341,16 @@ elasticsearch:
     - "9200:9200"
   volumes:
     - elasticsearch_data:/usr/share/elasticsearch/data
+  healthcheck:
+    test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
 ```
 
 Single node, security disabled for dev. Free Basic license includes kNN + full-text search.
+
+Backend/worker use `depends_on: elasticsearch: condition: service_healthy` to wait for ES startup (30-60s).
 
 ### 5.2 Remove Qdrant
 
@@ -277,17 +386,54 @@ No data migration tool. Re-ingest documents after switching. The ingestion pipel
 
 ## File Summary
 
+### New Files
+
 | File | Action |
 |---|---|
 | `backend/app/pipeline/base/vectorstore.py` | **New** — BaseVectorStore ABC |
 | `backend/app/vectorstore/elasticsearch_store.py` | **New** — ElasticsearchStore implementation |
 | `backend/app/vectorstore/factory.py` | **New** — VectorStoreFactory |
+
+### Core Edits
+
+| File | Action |
+|---|---|
+| `backend/app/pipeline/base/chunker.py` | **Edit** — add `user_id` field, rename `qdrant_payload()` → `to_document()` |
 | `backend/app/core/config.py` | **Edit** — add ES settings |
-| `backend/app/services/ingestion.py` | **Edit** — use vectorstore for parents + children |
-| `backend/app/agent/nodes/retriever.py` | **Edit** — use vectorstore.search() + fetch_parents() |
+| `backend/app/services/ingestion.py` | **Edit** — use vectorstore for parents + children, update `delete_document()` |
+| `backend/app/agent/nodes/retriever.py` | **Edit** — use vectorstore.search() + fetch_parents(), fix dict access |
 | `backend/app/api/chunks.py` | **Edit** — use vectorstore.get_by_doc_id() |
 | `backend/app/main.py` | **Edit** — initialize vectorstore in lifespan |
-| `docker-compose.yml` | **Edit** — add ES, remove Qdrant |
-| `pyproject.toml` | **Edit** — add elasticsearch[async], remove qdrant-client |
-| `backend/app/vectorstore/qdrant_client.py` | **Delete** |
 | `backend/app/models/document.py` | **Edit** — remove ParentChunk |
+| `backend/app/core/database.py` | **Edit** — remove ParentChunk table creation |
+
+### Infrastructure
+
+| File | Action |
+|---|---|
+| `docker-compose.yml` | **Edit** — add ES with healthcheck, remove Qdrant |
+| `pyproject.toml` | **Edit** — add elasticsearch[async], remove qdrant-client |
+| `.env.example` | **Edit** — add `ELASTICSEARCH_URL`, remove `QDRANT_HOST`/`QDRANT_PORT` |
+
+### Tests
+
+| File | Action |
+|---|---|
+| `tests/unit/pipeline/test_schemas.py` | **Edit** — update `qdrant_payload()` tests → `to_document()` |
+| `tests/unit/agent/test_retriever.py` | **Edit** — update QdrantWrapper patches to use vectorstore |
+| `tests/integration/test_ingestion_pipeline.py` | **Edit** — update QdrantWrapper imports/references |
+| `tests/integration/test_chat_pipeline.py` | **Edit** — update Qdrant references |
+
+### Delete
+
+| File | Action |
+|---|---|
+| `backend/app/vectorstore/qdrant_client.py` | **Delete** — replaced by elasticsearch_store.py |
+
+### Documentation (update references)
+
+| File | Action |
+|---|---|
+| `CLAUDE.md` | **Edit** — update vectorstore references |
+| `scripts/seed_demo_data.py` | **Edit** — update "Requires: qdrant" docstring |
+| `scripts/seed_custom_eval.py` | **Edit** — update "Requires: qdrant" docstring |
