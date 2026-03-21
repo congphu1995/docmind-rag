@@ -3,38 +3,42 @@ from sqlalchemy import select
 
 from backend.app.api.dependencies import get_current_user
 from backend.app.core.database import AsyncSessionLocal
-from backend.app.models.document import Document, ParentChunk
-from backend.app.vectorstore.qdrant_client import QdrantWrapper
+from backend.app.models.document import Document
+from backend.app.vectorstore.factory import VectorStoreFactory
 
 router = APIRouter()
 
 
-def _build_chunk_tree(parents: list, children: list[dict]) -> list[dict]:
-    """Build parent-child tree from flat lists."""
-    tree = []
-    children_by_parent = {}
+def _build_chunk_tree(all_chunks: list[dict]) -> list[dict]:
+    """Build parent-child tree from flat list of ES documents."""
+    parents = [c for c in all_chunks if c.get("is_parent")]
+    children = [c for c in all_chunks if not c.get("is_parent")]
+
+    children_by_parent: dict[str, list[dict]] = {}
     for child in children:
         pid = child.get("parent_id", "")
         children_by_parent.setdefault(pid, []).append(child)
 
+    tree = []
     for parent in parents:
         tree.append({
-            "chunk_id": parent.chunk_id,
-            "content_raw": parent.content_raw,
-            "content_markdown": parent.content_markdown,
-            "content_html": parent.content_html,
-            "type": parent.type,
-            "page": parent.page,
-            "section": parent.section,
-            "language": parent.language,
-            "word_count": parent.word_count,
-            "children": children_by_parent.get(parent.chunk_id, []),
+            "chunk_id": parent["chunk_id"],
+            "content_raw": parent.get("content_raw", ""),
+            "content_markdown": parent.get("content_markdown"),
+            "content_html": parent.get("content_html"),
+            "type": parent.get("type", "text"),
+            "page": parent.get("page", 0),
+            "section": parent.get("section", ""),
+            "language": parent.get("language", "en"),
+            "word_count": parent.get("word_count", 0),
+            "children": children_by_parent.get(parent["chunk_id"], []),
         })
 
     # Add orphan children (atomic chunks with no parent)
-    orphan_parent_ids = set(children_by_parent.keys()) - {p.chunk_id for p in parents}
+    parent_ids = {p["chunk_id"] for p in parents}
+    orphan_parent_ids = set(children_by_parent.keys()) - parent_ids
     for pid in orphan_parent_ids:
-        if not pid:  # empty parent_id = atomic
+        if not pid:
             for child in children_by_parent[pid]:
                 tree.append({
                     "chunk_id": child["chunk_id"],
@@ -71,36 +75,22 @@ async def get_document_chunks(
         if not doc_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Document not found")
 
-        # Fetch parents from PostgreSQL
-        query = select(ParentChunk).where(ParentChunk.doc_id == doc_id)
-        if type_filter:
-            query = query.where(ParentChunk.type == type_filter)
-        if page_filter is not None:
-            query = query.where(ParentChunk.page == page_filter)
+    # Fetch all chunks from vectorstore
+    vectorstore = VectorStoreFactory.create()
+    all_chunks = await vectorstore.get_by_doc_id(doc_id)
 
-        result = await session.execute(query)
-        parents = result.scalars().all()
-
-    # Fetch children from Qdrant
-    qdrant = QdrantWrapper()
-    children = await qdrant.get_by_doc_id(doc_id)
-
-    # Apply filters to children
+    # Apply filters
     if type_filter:
-        children = [c for c in children if c.get("type") == type_filter]
+        all_chunks = [c for c in all_chunks if c.get("type") == type_filter]
     if page_filter is not None:
-        children = [c for c in children if c.get("page") == page_filter]
+        all_chunks = [c for c in all_chunks if c.get("page") == page_filter]
     if search:
         search_lower = search.lower()
-        children = [
-            c for c in children
+        all_chunks = [
+            c for c in all_chunks
             if search_lower in c.get("content_raw", "").lower()
             or search_lower in c.get("content", "").lower()
         ]
-        parents = [
-            p for p in parents
-            if search_lower in (p.content_raw or "").lower()
-        ]
 
-    tree = _build_chunk_tree(parents, children)
+    tree = _build_chunk_tree(all_chunks)
     return {"doc_id": doc_id, "chunks": tree, "total": len(tree)}
