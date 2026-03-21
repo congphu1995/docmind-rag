@@ -29,6 +29,20 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
 
+  langfuse:
+    image: langfuse/langfuse:2
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: "postgresql://docmind:docmind@postgres:5432/docmind"
+      NEXTAUTH_SECRET: "docmind-langfuse-secret"
+      NEXTAUTH_URL: "http://localhost:3001"
+      SALT: "docmind-langfuse-salt"
+      TELEMETRY_ENABLED: "false"
+      TZ: Asia/Ho_Chi_Minh
+    depends_on:
+      - postgres
+
   backend:
     build:
       context: .
@@ -40,6 +54,7 @@ services:
       - QDRANT_HOST=qdrant
       - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
       - REDIS_URL=redis://redis:6379/0
+      - LANGFUSE_HOST=http://langfuse:3000
       - TZ=Asia/Ho_Chi_Minh
     depends_on:
       - qdrant
@@ -56,6 +71,7 @@ services:
       - QDRANT_HOST=qdrant
       - POSTGRES_URL=postgresql+asyncpg://docmind:docmind@postgres:5432/docmind
       - REDIS_URL=redis://redis:6379/0
+      - LANGFUSE_HOST=http://langfuse:3000
       - TZ=Asia/Ho_Chi_Minh
     depends_on:
       - qdrant
