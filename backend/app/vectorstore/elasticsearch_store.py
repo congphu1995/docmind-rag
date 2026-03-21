@@ -45,7 +45,6 @@ INDEX_MAPPINGS = {
 
 
 class ElasticsearchStore(BaseVectorStore):
-
     def __init__(self):
         kwargs = {"hosts": [settings.elasticsearch_url]}
         if settings.elasticsearch_username:
@@ -84,7 +83,9 @@ class ElasticsearchStore(BaseVectorStore):
             doc = chunk.to_document()
             if vectors is not None and i < len(vectors):
                 doc["embedding"] = vectors[i]
-            operations.append({"index": {"_index": self._index, "_id": doc["chunk_id"]}})
+            operations.append(
+                {"index": {"_index": self._index, "_id": doc["chunk_id"]}}
+            )
             operations.append(doc)
 
         try:
@@ -221,7 +222,12 @@ class ElasticsearchStore(BaseVectorStore):
                 docs[cid] = hit
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return [{"score": score, **docs[cid]} for cid, score in ranked]
+
+        # Normalize to 0-1 range so quality assessment thresholds work
+        max_possible = 2 / (k + 1)  # score when doc is rank 1 in both lists
+        return [
+            {"score": score / max_possible, **docs[cid]} for cid, score in ranked
+        ]
 
     def _build_filters(self, filters: dict | None) -> list[dict]:
         conditions: list[dict] = [{"term": {"is_parent": False}}]
