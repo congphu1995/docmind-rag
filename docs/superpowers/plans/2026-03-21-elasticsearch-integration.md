@@ -44,6 +44,8 @@
 | `scripts/seed_demo_data.py` | Update docstring |
 | `scripts/seed_custom_eval.py` | Update docstring |
 | `CLAUDE.md` | Update vectorstore references |
+| `DESIGN.md` | Update Qdrant refs to Elasticsearch throughout |
+| `README.md` | Update Qdrant refs if present |
 
 ### Deleted Files
 | File | Reason |
@@ -534,6 +536,50 @@ async def test_get_by_doc_id(store, mock_es_client):
     })
     chunks = await store.get_by_doc_id("d1")
     assert len(chunks) == 2
+
+
+def test_build_filters_default(store):
+    """Default filters always include is_parent: false."""
+    filters = store._build_filters(None)
+    assert {"term": {"is_parent": False}} in filters
+    assert len(filters) == 1
+
+
+def test_build_filters_with_doc_ids(store):
+    filters = store._build_filters({"doc_ids": ["d1", "d2"]})
+    assert {"term": {"is_parent": False}} in filters
+    assert {"terms": {"doc_id": ["d1", "d2"]}} in filters
+
+
+def test_build_filters_with_all_options(store):
+    filters = store._build_filters({
+        "doc_ids": ["d1"],
+        "language": "en",
+        "type": "text",
+        "user_id": "u1",
+    })
+    assert len(filters) == 5  # is_parent + 4 filters
+
+
+async def test_score_threshold_is_accepted_but_not_applied(store, mock_es_client):
+    """score_threshold is accepted for interface compat but RRF scores are different scale."""
+    bm25_resp = {"hits": {"hits": [
+        {"_source": {"chunk_id": "c1", "parent_id": "p1", "doc_id": "d1",
+                     "doc_name": "t.pdf", "content_raw": "x", "type": "text",
+                     "page": 1, "section": "s", "language": "en",
+                     "word_count": 10, "metadata": {}}, "_score": 1.0},
+    ]}}
+    knn_resp = {"hits": {"hits": []}}
+    mock_es_client.search = AsyncMock(side_effect=[bm25_resp, knn_resp])
+
+    # Pass a high threshold — should still return results (threshold ignored)
+    results = await store.search(
+        query_vector=[0.1] * 1536,
+        query_text="test",
+        top_k=5,
+        score_threshold=0.99,
+    )
+    assert len(results) == 1
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -543,7 +589,9 @@ Expected: FAIL — `elasticsearch_store` module doesn't exist
 
 - [ ] **Step 3: Implement ElasticsearchStore**
 
-Create `backend/app/vectorstore/elasticsearch_store.py`:
+Create `backend/app/vectorstore/elasticsearch_store.py`.
+
+**IMPORTANT — ES 8.x API**: The `elasticsearch-py` 8.x client deprecates the `body=` parameter. Use keyword arguments (`query=`, `knn=`, `size=`, `mappings=`, `settings=`) instead.
 
 ```python
 """
@@ -558,38 +606,37 @@ from backend.app.core.logging import logger
 from backend.app.pipeline.base.chunker import Chunk
 from backend.app.pipeline.base.vectorstore import BaseVectorStore
 
-INDEX_MAPPING = {
-    "settings": {
-        "number_of_shards": 1,
-        "number_of_replicas": 0,
-    },
-    "mappings": {
-        "properties": {
-            "chunk_id": {"type": "keyword"},
-            "parent_id": {"type": "keyword"},
-            "doc_id": {"type": "keyword"},
-            "doc_name": {"type": "keyword"},
-            "user_id": {"type": "keyword"},
-            "content": {"type": "text", "index": False},
-            "content_raw": {"type": "text", "analyzer": "standard"},
-            "content_markdown": {"type": "text", "index": False},
-            "content_html": {"type": "text", "index": False},
-            "embedding": {
-                "type": "dense_vector",
-                "dims": settings.embedding_dimensions,
-                "index": True,
-                "similarity": "cosine",
-            },
-            "type": {"type": "keyword"},
-            "page": {"type": "integer"},
-            "section": {"type": "keyword"},
-            "language": {"type": "keyword"},
-            "word_count": {"type": "integer"},
-            "is_parent": {"type": "boolean"},
-            "metadata": {"type": "object", "dynamic": True},
-            "created_at": {"type": "date"},
-        }
-    },
+INDEX_SETTINGS = {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+}
+
+INDEX_MAPPINGS = {
+    "properties": {
+        "chunk_id": {"type": "keyword"},
+        "parent_id": {"type": "keyword"},
+        "doc_id": {"type": "keyword"},
+        "doc_name": {"type": "keyword"},
+        "user_id": {"type": "keyword"},
+        "content": {"type": "text", "index": False},
+        "content_raw": {"type": "text", "analyzer": "standard"},
+        "content_markdown": {"type": "text", "index": False},
+        "content_html": {"type": "text", "index": False},
+        "embedding": {
+            "type": "dense_vector",
+            "dims": settings.embedding_dimensions,
+            "index": True,
+            "similarity": "cosine",
+        },
+        "type": {"type": "keyword"},
+        "page": {"type": "integer"},
+        "section": {"type": "keyword"},
+        "language": {"type": "keyword"},
+        "word_count": {"type": "integer"},
+        "is_parent": {"type": "boolean"},
+        "metadata": {"type": "object", "dynamic": True},
+        "created_at": {"type": "date"},
+    }
 }
 
 
@@ -612,7 +659,9 @@ class ElasticsearchStore(BaseVectorStore):
             exists = await self._client.indices.exists(index=self._index)
             if not exists:
                 await self._client.indices.create(
-                    index=self._index, body=INDEX_MAPPING
+                    index=self._index,
+                    settings=INDEX_SETTINGS,
+                    mappings=INDEX_MAPPINGS,
                 )
                 logger.info("es_index_created", index=self._index)
         except Exception as e:
@@ -680,17 +729,15 @@ class ElasticsearchStore(BaseVectorStore):
         try:
             response = await self._client.search(
                 index=self._index,
-                body={
-                    "query": {
-                        "bool": {
-                            "filter": [
-                                {"terms": {"chunk_id": parent_ids}},
-                                {"term": {"is_parent": True}},
-                            ]
-                        }
-                    },
-                    "size": len(parent_ids),
+                query={
+                    "bool": {
+                        "filter": [
+                            {"terms": {"chunk_id": parent_ids}},
+                            {"term": {"is_parent": True}},
+                        ]
+                    }
                 },
+                size=len(parent_ids),
             )
         except Exception as e:
             raise VectorStoreError(f"ES fetch_parents failed: {e}") from e
@@ -701,7 +748,7 @@ class ElasticsearchStore(BaseVectorStore):
         try:
             await self._client.delete_by_query(
                 index=self._index,
-                body={"query": {"term": {"doc_id": doc_id}}},
+                query={"term": {"doc_id": doc_id}},
             )
             logger.info("es_delete_done", doc_id=doc_id)
         except Exception as e:
@@ -711,10 +758,8 @@ class ElasticsearchStore(BaseVectorStore):
         try:
             response = await self._client.search(
                 index=self._index,
-                body={
-                    "query": {"term": {"doc_id": doc_id}},
-                    "size": 10000,
-                },
+                query={"term": {"doc_id": doc_id}},
+                size=10000,
             )
             return [hit["_source"] for hit in response["hits"]["hits"]]
         except Exception as e:
@@ -726,34 +771,32 @@ class ElasticsearchStore(BaseVectorStore):
     async def _bm25_search(
         self, query_text: str, top_k: int, filters: dict | None
     ) -> list[dict]:
-        body: dict = {
-            "query": {
+        response = await self._client.search(
+            index=self._index,
+            query={
                 "bool": {
                     "must": [{"match": {"content_raw": query_text}}],
                     "filter": self._build_filters(filters),
                 }
             },
-            "size": top_k,
-        }
-
-        response = await self._client.search(index=self._index, body=body)
+            size=top_k,
+        )
         return [hit["_source"] for hit in response["hits"]["hits"]]
 
     async def _knn_search(
         self, query_vector: list[float], top_k: int, filters: dict | None
     ) -> list[dict]:
-        body: dict = {
-            "knn": {
+        response = await self._client.search(
+            index=self._index,
+            knn={
                 "field": "embedding",
                 "query_vector": query_vector,
                 "k": top_k,
                 "num_candidates": top_k * 5,
                 "filter": {"bool": {"filter": self._build_filters(filters)}},
             },
-            "size": top_k,
-        }
-
-        response = await self._client.search(index=self._index, body=body)
+            size=top_k,
+        )
         return [hit["_source"] for hit in response["hits"]["hits"]]
 
     def _rrf_merge(
@@ -823,11 +866,11 @@ import pytest
 from unittest.mock import patch
 
 from backend.app.vectorstore.factory import VectorStoreFactory
-from backend.app.vectorstore.elasticsearch_store import ElasticsearchStore
 
 
-@patch("backend.app.vectorstore.factory.ElasticsearchStore")
+@patch("backend.app.vectorstore.elasticsearch_store.ElasticsearchStore")
 def test_factory_creates_elasticsearch(mock_es_cls):
+    """Factory uses lazy import — patch at the source module."""
     store = VectorStoreFactory.create("elasticsearch")
     mock_es_cls.assert_called_once()
 
@@ -837,7 +880,7 @@ def test_factory_rejects_unknown_strategy():
         VectorStoreFactory.create("pinecone")
 
 
-@patch("backend.app.vectorstore.factory.ElasticsearchStore")
+@patch("backend.app.vectorstore.elasticsearch_store.ElasticsearchStore")
 def test_factory_uses_config_default(mock_es_cls):
     store = VectorStoreFactory.create()
     mock_es_cls.assert_called_once()
@@ -986,6 +1029,8 @@ from backend.app.models.document import Document
 
 Also update the stage log label from `"stage_store_qdrant"` and `"stage_store_postgres"` to just `"stage_store_vectorstore"`.
 
+**Note:** The Prometheus metric labels change from `store_qdrant`/`store_postgres` to `store_vectorstore`. If there are existing Grafana dashboards querying these labels, they will need updating.
+
 - [ ] **Step 2: Run existing tests to check nothing is broken**
 
 Run: `pytest tests/unit/ -v --ignore=tests/unit/vectorstore`
@@ -1010,17 +1055,19 @@ git commit -m "feat: use vectorstore in ingestion service, remove ParentChunk st
 
 In `backend/app/agent/nodes/retriever.py`:
 
-Replace imports (lines 11-12, 18, 24):
+Replace imports. Remove ALL of these (lines 11, 15, 18, 24 — `_fetch_parents` no longer queries PostgreSQL):
 ```python
-# Remove:
-from sqlalchemy import select
-from backend.app.core.database import AsyncSessionLocal
-from backend.app.models.document import ParentChunk
-from backend.app.vectorstore.qdrant_client import QdrantWrapper
+# Remove ALL of these:
+from sqlalchemy import select                                   # line 11
+from backend.app.core.database import AsyncSessionLocal          # line 15
+from backend.app.models.document import ParentChunk              # line 18
+from backend.app.vectorstore.qdrant_client import QdrantWrapper  # line 24
 
 # Add:
 from backend.app.vectorstore.factory import VectorStoreFactory
 ```
+
+Keep these existing imports untouched: `time`, `RAGAgentState`, `settings`, `logger`, `RETRIEVAL_DURATION`, `HumanMessage`, `RunnableConfig`, `get_mini_model`, `OpenAIEmbedder`.
 
 Update `_assess_quality` (lines 30-35) — change attribute access to dict access:
 
@@ -1513,6 +1560,8 @@ git commit -m "test: update integration tests for Elasticsearch"
 - Modify: `scripts/seed_demo_data.py`
 - Modify: `scripts/seed_custom_eval.py`
 - Modify: `CLAUDE.md`
+- Modify: `DESIGN.md` (Qdrant references in architecture, infrastructure sections)
+- Modify: `README.md` (if it references Qdrant/QdrantWrapper)
 
 - [ ] **Step 1: Update seed script docstrings**
 
@@ -1551,10 +1600,23 @@ to:
 → Elasticsearch (child vectors + BM25 + parent chunks) + PostgreSQL (document metadata)
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Update DESIGN.md**
+
+In `DESIGN.md`, update Qdrant references throughout:
+- Infrastructure table: replace "Qdrant v1.9" / port 6333 with "Elasticsearch 8.15" / port 9200
+- Docker Compose stack: replace `qdrant` with `elasticsearch`
+- Architecture diagrams: replace "Qdrant (child vectors)" with "Elasticsearch (hybrid search + parent chunks)"
+- Component lists: replace `QdrantWrapper` with `ElasticsearchStore`
+- Search description: note hybrid search (BM25 + dense vectors via RRF)
+
+- [ ] **Step 4: Update README.md if needed**
+
+Search for Qdrant/QdrantWrapper references in README.md and update to Elasticsearch.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/seed_demo_data.py scripts/seed_custom_eval.py CLAUDE.md
+git add scripts/seed_demo_data.py scripts/seed_custom_eval.py CLAUDE.md DESIGN.md README.md
 git commit -m "docs: update references from Qdrant to Elasticsearch"
 ```
 
