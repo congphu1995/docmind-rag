@@ -56,9 +56,7 @@ async def test_reranker_node_uses_configured_strategy():
     mock_reranker = AsyncMock()
     mock_reranker.rerank.return_value = chunks[:3]
 
-    with patch(
-        "backend.app.agent.nodes.reranker.RerankerFactory"
-    ) as mock_factory:
+    with patch("backend.app.agent.nodes.reranker.RerankerFactory") as mock_factory:
         mock_factory.create.return_value = mock_reranker
-        result = await reranker_node(state)
+        await reranker_node(state)
         mock_factory.create.assert_called_once()

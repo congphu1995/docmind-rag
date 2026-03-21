@@ -1,12 +1,14 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from backend.app.pipeline.multimodal.figure_describer import FigureDescriber
 
 
 async def test_describe_returns_text():
     mock_llm = AsyncMock()
-    mock_llm.complete.return_value = "Bar chart showing Q1-Q4 revenue growth from 10M to 15M."
+    mock_llm.complete.return_value = (
+        "Bar chart showing Q1-Q4 revenue growth from 10M to 15M."
+    )
     describer = FigureDescriber(llm=mock_llm)
     result = await describer.describe(
         image_b64="iVBORw0KGgoAAAANSUhEUg==",

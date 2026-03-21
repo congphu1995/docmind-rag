@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
@@ -74,13 +74,10 @@ class BaseParser(ABC):
         doc_id: str,
         doc_name: str,
         **kwargs,
-    ) -> list[ParsedElement]:
-        ...
+    ) -> list[ParsedElement]: ...
 
     @abstractmethod
-    def supports(self, file_ext: str) -> bool:
-        ...
+    def supports(self, file_ext: str) -> bool: ...
 
     @abstractmethod
-    def get_capabilities(self) -> ParserCapabilities:
-        ...
+    def get_capabilities(self) -> ParserCapabilities: ...

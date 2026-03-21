@@ -1,19 +1,20 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from backend.app.pipeline.parsers.factory import ParserFactory
-from backend.app.pipeline.base.parser import ElementType
 
 
 def test_factory_creates_docling():
     parser = ParserFactory.create("docling")
     from backend.app.pipeline.parsers.docling_parser import DoclingParser
+
     assert isinstance(parser, DoclingParser)
 
 
 def test_factory_creates_pymupdf():
     parser = ParserFactory.create("pymupdf")
     from backend.app.pipeline.parsers.pymupdf_parser import PyMuPDFParser
+
     assert isinstance(parser, PyMuPDFParser)
 
 
@@ -24,6 +25,7 @@ def test_factory_raises_on_unknown():
 
 def test_pymupdf_supports_only_pdf():
     from backend.app.pipeline.parsers.pymupdf_parser import PyMuPDFParser
+
     p = PyMuPDFParser()
     assert p.supports(".pdf") is True
     assert p.supports(".docx") is False
@@ -31,6 +33,7 @@ def test_pymupdf_supports_only_pdf():
 
 def test_docling_supports_multiple_formats():
     from backend.app.pipeline.parsers.docling_parser import DoclingParser
+
     p = DoclingParser()
     for ext in [".pdf", ".docx", ".txt", ".md"]:
         assert p.supports(ext) is True
@@ -44,6 +47,7 @@ def test_auto_select_scanned_returns_docling(mock_preprocessor):
     }
     parser = ParserFactory.auto_select("scanned.pdf")
     from backend.app.pipeline.parsers.docling_parser import DoclingParser
+
     assert isinstance(parser, DoclingParser)
 
 
@@ -55,10 +59,12 @@ def test_auto_select_large_clean_returns_pymupdf(mock_preprocessor):
     }
     parser = ParserFactory.auto_select("large.pdf")
     from backend.app.pipeline.parsers.pymupdf_parser import PyMuPDFParser
+
     assert isinstance(parser, PyMuPDFParser)
 
 
 def test_auto_select_docx_returns_docling():
     parser = ParserFactory.auto_select("document.docx")
     from backend.app.pipeline.parsers.docling_parser import DoclingParser
+
     assert isinstance(parser, DoclingParser)
