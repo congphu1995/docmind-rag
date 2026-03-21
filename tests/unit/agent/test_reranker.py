@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, AsyncMock
 
 from backend.app.agent.nodes.reranker import reranker_node
