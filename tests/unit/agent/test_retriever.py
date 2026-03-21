@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from backend.app.agent.nodes.retriever import retriever_node, _assess_quality
@@ -78,7 +77,6 @@ async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_qdrant_c
 
     mock_qdrant = MagicMock()
     mock_qdrant_cls.return_value = mock_qdrant
-    # First attempt: low scores, second: high scores
     mock_qdrant.search = AsyncMock(side_effect=[
         [MagicMock(score=0.3, payload={"parent_id": "p1", "doc_id": "d1"})],
         [MagicMock(score=0.85, payload={"parent_id": "p1", "doc_id": "d1"})],
@@ -86,10 +84,14 @@ async def test_retriever_retries_on_low_quality(mock_embedder_cls, mock_qdrant_c
 
     mock_fetch.return_value = [{"content": "result", "score": 0.85, "chunk_id": "c1"}]
 
-    with patch("backend.app.agent.nodes.retriever.LLMFactory") as mock_llm_factory:
-        mock_llm = AsyncMock()
-        mock_llm_factory.create_mini.return_value = mock_llm
-        mock_llm.complete = AsyncMock(return_value="expanded query")
+    with patch("backend.app.agent.nodes.retriever.get_mini_model") as mock_get_mini:
+        mock_llm = MagicMock()
+        mock_get_mini.return_value = mock_llm
+        mock_bound = AsyncMock()
+        mock_llm.bind.return_value = mock_bound
+        mock_bound.ainvoke = AsyncMock(
+            return_value=MagicMock(content="expanded query")
+        )
 
         state = _make_state()
         result = await retriever_node(state)

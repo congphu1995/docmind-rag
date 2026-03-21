@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from backend.app.agent.nodes.generator import (
     generator_node,
@@ -67,11 +66,11 @@ async def test_direct_response_returns_greeting():
     assert result["citations"] == []
 
 
-@patch("backend.app.agent.nodes.generator.LLMFactory")
-async def test_direct_llm_no_retrieval(mock_factory):
+@patch("backend.app.agent.nodes.generator.get_chat_model")
+async def test_direct_llm_no_retrieval(mock_get_chat):
     mock_llm = AsyncMock()
-    mock_factory.create.return_value = mock_llm
-    mock_llm.complete = AsyncMock(return_value="The sky is blue.")
+    mock_get_chat.return_value = mock_llm
+    mock_llm.ainvoke = AsyncMock(return_value=MagicMock(content="The sky is blue."))
 
     state = _make_state()
     state["query_type"] = "general"
@@ -81,14 +80,13 @@ async def test_direct_llm_no_retrieval(mock_factory):
     assert result["citations"] == []
 
 
-@patch("backend.app.agent.nodes.generator.LLMFactory")
-async def test_generator_produces_answer(mock_factory):
+@patch("backend.app.agent.nodes.generator.get_chat_model")
+async def test_generator_produces_answer(mock_get_chat):
     mock_llm = AsyncMock()
-    mock_factory.create.return_value = mock_llm
-    mock_llm.complete = AsyncMock(
-        return_value="Revenue was $10M [Source 1]."
+    mock_get_chat.return_value = mock_llm
+    mock_llm.ainvoke = AsyncMock(
+        return_value=MagicMock(content="Revenue was $10M [Source 1].")
     )
-    mock_llm.model_name = "gpt-4o"
 
     chunks = [
         {"content": "Revenue was $10M", "doc_name": "report.pdf", "page": 5,

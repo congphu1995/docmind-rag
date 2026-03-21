@@ -1,7 +1,7 @@
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from backend.app.agent.nodes.query_analyzer import query_analyzer
+from backend.app.schemas.chat import QueryAnalysis
 
 
 def _make_state(query: str) -> dict:
@@ -27,13 +27,14 @@ def _make_state(query: str) -> dict:
     }
 
 
-@patch("backend.app.agent.nodes.query_analyzer.LLMFactory")
-async def test_factual_query_classified(mock_factory):
-    mock_llm = AsyncMock()
-    mock_factory.create_mini.return_value = mock_llm
+@patch("backend.app.agent.nodes.query_analyzer.get_mini_model")
+async def test_factual_query_classified(mock_get_mini):
+    mock_llm = MagicMock()
+    mock_get_mini.return_value = mock_llm
 
-    from backend.app.schemas.chat import QueryAnalysis
-    mock_llm.complete_structured = AsyncMock(
+    mock_structured = AsyncMock()
+    mock_llm.with_structured_output.return_value = mock_structured
+    mock_structured.ainvoke = AsyncMock(
         return_value=QueryAnalysis(
             query_type="factual",
             language="en",
@@ -50,17 +51,15 @@ async def test_factual_query_classified(mock_factory):
     assert len(result["agent_trace"]) > 0
 
 
-@patch("backend.app.agent.nodes.query_analyzer.LLMFactory")
-async def test_greeting_classified(mock_factory):
-    mock_llm = AsyncMock()
-    mock_factory.create_mini.return_value = mock_llm
+@patch("backend.app.agent.nodes.query_analyzer.get_mini_model")
+async def test_greeting_classified(mock_get_mini):
+    mock_llm = MagicMock()
+    mock_get_mini.return_value = mock_llm
 
-    from backend.app.schemas.chat import QueryAnalysis
-    mock_llm.complete_structured = AsyncMock(
-        return_value=QueryAnalysis(
-            query_type="greeting",
-            language="en",
-        )
+    mock_structured = AsyncMock()
+    mock_llm.with_structured_output.return_value = mock_structured
+    mock_structured.ainvoke = AsyncMock(
+        return_value=QueryAnalysis(query_type="greeting", language="en")
     )
 
     state = _make_state("Hello!")
@@ -69,11 +68,14 @@ async def test_greeting_classified(mock_factory):
     assert result["query_type"] == "greeting"
 
 
-@patch("backend.app.agent.nodes.query_analyzer.LLMFactory")
-async def test_analysis_failure_defaults_to_factual(mock_factory):
-    mock_llm = AsyncMock()
-    mock_factory.create_mini.return_value = mock_llm
-    mock_llm.complete_structured = AsyncMock(side_effect=Exception("LLM down"))
+@patch("backend.app.agent.nodes.query_analyzer.get_mini_model")
+async def test_analysis_failure_defaults_to_factual(mock_get_mini):
+    mock_llm = MagicMock()
+    mock_get_mini.return_value = mock_llm
+
+    mock_structured = AsyncMock()
+    mock_llm.with_structured_output.return_value = mock_structured
+    mock_structured.ainvoke = AsyncMock(side_effect=Exception("LLM down"))
 
     state = _make_state("What is the policy limit?")
     result = await query_analyzer(state)

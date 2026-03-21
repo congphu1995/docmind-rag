@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from backend.app.agent.nodes.query_rewriter import query_rewriter, _should_use_hyde
 
@@ -47,12 +46,18 @@ def test_hyde_used_for_multi_hop():
     assert _should_use_hyde("Impact of policy on claims?", "multi_hop") is True
 
 
-@patch("backend.app.agent.nodes.query_rewriter.LLMFactory")
-async def test_rewriter_with_hyde(mock_factory):
-    mock_llm = AsyncMock()
-    mock_factory.create_mini.return_value = mock_llm
-    mock_llm.complete = AsyncMock(
-        side_effect=["expanded query about revenue comparison", "hypothetical answer about revenue"]
+@patch("backend.app.agent.nodes.query_rewriter.get_mini_model")
+async def test_rewriter_with_hyde(mock_get_mini):
+    mock_llm = MagicMock()
+    mock_get_mini.return_value = mock_llm
+
+    mock_bound = AsyncMock()
+    mock_llm.bind.return_value = mock_bound
+    mock_bound.ainvoke = AsyncMock(
+        side_effect=[
+            MagicMock(content="expanded query about revenue comparison"),
+            MagicMock(content="hypothetical answer about revenue"),
+        ]
     )
 
     state = _make_state(
@@ -65,11 +70,16 @@ async def test_rewriter_with_hyde(mock_factory):
     assert result["rewritten_query"] != ""
 
 
-@patch("backend.app.agent.nodes.query_rewriter.LLMFactory")
-async def test_rewriter_without_hyde(mock_factory):
-    mock_llm = AsyncMock()
-    mock_factory.create_mini.return_value = mock_llm
-    mock_llm.complete = AsyncMock(return_value="revenue Q1")
+@patch("backend.app.agent.nodes.query_rewriter.get_mini_model")
+async def test_rewriter_without_hyde(mock_get_mini):
+    mock_llm = MagicMock()
+    mock_get_mini.return_value = mock_llm
+
+    mock_bound = AsyncMock()
+    mock_llm.bind.return_value = mock_bound
+    mock_bound.ainvoke = AsyncMock(
+        return_value=MagicMock(content="revenue Q1")
+    )
 
     state = _make_state("Revenue Q1", "factual")
     result = await query_rewriter(state)
