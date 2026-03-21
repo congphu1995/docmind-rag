@@ -14,7 +14,7 @@ from backend.app.core.metrics import (
     INGESTION_DOCUMENTS_TOTAL,
     INGESTION_STAGE_DURATION,
 )
-from backend.app.models.document import Document, ParentChunk
+from backend.app.models.document import Document
 from backend.app.pipeline.chunkers.enricher import ContextEnricher
 from backend.app.pipeline.chunkers.quality_filter import QualityFilter
 from backend.app.pipeline.chunkers.smart_router import SmartRouter
@@ -25,7 +25,7 @@ from backend.app.pipeline.parsers.metadata_extractor import MetadataExtractor
 from backend.app.pipeline.multimodal.figure_describer import FigureDescriber
 from backend.app.pipeline.multimodal.table_representer import TableRepresenter
 from backend.app.pipeline.parsers.preprocessor import PDFPreprocessor
-from backend.app.vectorstore.qdrant_client import QdrantWrapper
+from backend.app.vectorstore.factory import VectorStoreFactory
 
 
 class IngestionService:
@@ -44,7 +44,7 @@ class IngestionService:
         self._enricher = ContextEnricher(llm=mini_llm)
         self._quality_filter = QualityFilter()
         self._embedder = OpenAIEmbedder()
-        self._qdrant = QdrantWrapper()
+        self._vectorstore = VectorStoreFactory.create()
 
     async def ingest(
         self,
@@ -149,21 +149,29 @@ class IngestionService:
                 time.perf_counter() - start
             )
 
-            # 8. Store in Qdrant (children)
-            log.info("stage_store_qdrant")
+            # 8. Store in vectorstore (children with vectors + parents without)
+            log.info("stage_store_vectorstore")
             start = time.perf_counter()
-            await self._qdrant.upsert(final_children, vectors)
-            INGESTION_STAGE_DURATION.labels(stage="store_qdrant").observe(
+
+            # Set user_id on all chunks
+            for chunk in parent_chunks:
+                chunk.user_id = user_id or ""
+            for chunk in final_children:
+                chunk.user_id = user_id or ""
+
+            await self._vectorstore.upsert_chunks(parent_chunks)
+            await self._vectorstore.upsert_chunks(final_children, vectors)
+            INGESTION_STAGE_DURATION.labels(stage="store_vectorstore").observe(
                 time.perf_counter() - start
             )
 
-            # 9. Store parents in PostgreSQL
-            log.info("stage_store_postgres")
+            # 9. Store document record in PostgreSQL
+            log.info("stage_store_document")
             start = time.perf_counter()
-            await self._store_parents(
+            await self._store_document(
                 doc_id, doc_name, parent_chunks, doc_metadata, user_id=user_id
             )
-            INGESTION_STAGE_DURATION.labels(stage="store_postgres").observe(
+            INGESTION_STAGE_DURATION.labels(stage="store_document").observe(
                 time.perf_counter() - start
             )
 
@@ -192,7 +200,7 @@ class IngestionService:
             if clean_path != file_path and os.path.exists(clean_path):
                 os.unlink(clean_path)
 
-    async def _store_parents(
+    async def _store_document(
         self,
         doc_id: str,
         doc_name: str,
@@ -201,7 +209,6 @@ class IngestionService:
         user_id: str = None,
     ):
         async with AsyncSessionLocal() as session:
-            # Store document record
             doc = Document(
                 doc_id=doc_id,
                 doc_name=doc_name,
@@ -214,33 +221,13 @@ class IngestionService:
                 metadata_=doc_metadata,
             )
             session.add(doc)
-
-            for chunk in parent_chunks:
-                pg_chunk = ParentChunk(
-                    chunk_id=chunk.chunk_id,
-                    doc_id=doc_id,
-                    user_id=user_id,
-                    content_raw=chunk.content_raw,
-                    content_markdown=chunk.content_markdown,
-                    content_html=chunk.content_html,
-                    type=chunk.type,
-                    page=chunk.page,
-                    section=chunk.section,
-                    language=chunk.language,
-                    word_count=chunk.word_count,
-                    metadata_=doc_metadata,
-                )
-                session.add(pg_chunk)
             await session.commit()
 
     async def delete_document(self, doc_id: str):
-        await self._qdrant.delete_by_doc_id(doc_id)
+        await self._vectorstore.delete_by_doc_id(doc_id)
         async with AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
-            await session.execute(
-                delete(ParentChunk).where(ParentChunk.doc_id == doc_id)
-            )
             await session.execute(
                 delete(Document).where(Document.doc_id == doc_id)
             )
