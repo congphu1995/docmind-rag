@@ -45,6 +45,7 @@ def to_document(self) -> dict:
         "doc_id": self.doc_id,
         "doc_name": self.doc_name,
         "user_id": self.user_id,
+        "content": self.content,               # enriched text (used for embedding)
         "content_raw": self.content_raw,
         "content_markdown": self.content_markdown,
         "content_html": self.content_html,
@@ -54,8 +55,8 @@ def to_document(self) -> dict:
         "language": self.language,
         "word_count": self.word_count,
         "is_parent": self.is_parent,
+        "metadata": self.metadata,             # nested object, not flattened
         "created_at": datetime.utcnow().isoformat(),
-        **self.metadata,
     }
     return doc
 ```
@@ -82,6 +83,7 @@ Single index `docmind_chunks` stores both parents and children.
       "doc_name":         { "type": "keyword" },
       "user_id":          { "type": "keyword" },
 
+      "content":          { "type": "text", "index": false },
       "content_raw":      { "type": "text", "analyzer": "standard" },
       "content_markdown": { "type": "text", "index": false },
       "content_html":     { "type": "text", "index": false },
@@ -104,9 +106,10 @@ Single index `docmind_chunks` stores both parents and children.
 
 - **`content_raw`** — BM25-indexed with `standard` analyzer. Keyword search target.
 - **`embedding`** — Dense vector for children only. Parents have no embedding (field absent), so they don't participate in vector search.
+- **`content`** — Enriched text (post-`ContextEnricher`). Stored but not BM25-indexed. Kept for audit: shows what text was embedded.
 - **`content_markdown` / `content_html`** — Stored but not BM25-indexed (`index: false`). Served to LLM and UI.
 - **`is_parent`** — Boolean flag distinguishing parents from children in the same index.
-- **`metadata`** — Dynamic object for extensible fields (doc_type, date, org, etc.).
+- **`metadata`** — Nested object (not flattened to top level) for extensible fields (doc_type, date, org). Avoids key collisions with reserved fields like `type` or `page`.
 
 ---
 
@@ -148,7 +151,7 @@ class BaseVectorStore(ABC):
         self,
         parent_ids: list[str],
     ) -> list[dict]:
-        """Fetch parent chunks by their IDs."""
+        """Fetch parent chunks. parent_ids are chunk_id values of parent documents."""
         ...
 
     @abstractmethod
@@ -317,6 +320,7 @@ Current stages 8-9 (Qdrant upsert + PostgreSQL parent insert) collapse:
 ### 4.5 Chunk Viewer API (`backend/app/api/chunks.py`)
 
 - Separate Qdrant + PostgreSQL queries become single `vectorstore.get_by_doc_id()`
+- `_build_chunk_tree()` currently accesses parents via ORM attributes (`parent.chunk_id`, `parent.content_raw`). With ES, parents are dicts — change to dict access (`parent["chunk_id"]`, `parent["content_raw"]`), consistent with how children are already handled.
 - Same response shape, simpler implementation
 
 ### 4.6 App Startup (`backend/app/main.py`)
